@@ -1,0 +1,26 @@
+# Match the versions built into the container
+torch==2.8.0
+torchvision==0.23.0
+
+# PyTorch ecosystem
+pytorch-lightning==2.6.0
+tensordict==0.10.0
+torchmetrics
+
+# Tests and coverage
+pytest
+pytest-cov
+coverage
+
+# Other project dependencies
+tensorboard
+rich
+setuptools_scm
+torch-tb-profiler
+gitpython
+h5py
+netCDF4
+
+# Linting
+pylint
+black
