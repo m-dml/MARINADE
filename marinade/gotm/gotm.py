@@ -317,7 +317,7 @@ def run_gotm(
 
 
 class TracerSimulationOperator:
-    """Simulation operator class for combined tracer advection, diffusion and NPZD reactions.
+    """Simulation operator class for combined tracer advection, diffusion and BGC reactions.
 
     Should be initialized with the important numerical parameters and schemes for the simulation. Has a *forward* method
     for computing a single time step. Calling the operator object itself also calls its *forward* method.

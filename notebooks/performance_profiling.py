@@ -2,8 +2,16 @@
 # SBATCH --job-name=npzd_profiling
 # SBATCH --nodes=1
 # SBATCH --ntasks-per-node=48
+"""Performance profiling for MARINADE.
 
-# import stuff
+Pauleo Nimtz, 29.10.2026
+
+Use this script for profiling the performance of MARINADE components (advection, diffusion and BGC terms).
+
+Choose MARINADE settings (e.g., tridiagonal solvers, devices, ...) on the bottom of this script.
+
+The results of this script can be plotted with the Jupyter notebook 'performance_profiling.ipynb'.
+"""
 
 import gc
 import os
@@ -23,7 +31,7 @@ from tensordict import TensorDict
 
 
 class TracerSimulationProfiler:
-    """Simulation operator class for combined tracer advection, diffusion and NPZD reactions.
+    """Simulation operator class for combined tracer advection, diffusion and BGC reactions.
 
     Should be initialized with the important numerical parameters and schemes for the simulation. Has a *forward* method
     for computing a single time step. Calling the operator object itself also calls its *forward* method.
@@ -447,10 +455,9 @@ class TracerSimulationProfiler:
         return torch.stack(simulation, dim=1), torch.tensor(times, dtype=torch.float64).T
 
 
-def profile_npzd(save_path=None, device="cpu", rollout=False, requires_gradients=False, dif_method=None):
+def profile_npzd(load_path, save_path=None, device="cpu", rollout=False, requires_gradients=False, dif_method=None):
     """Measure time and memory costs of advection, diffusion and NPZD operators."""
 
-    path = "/gpfs/work/nimtz/experiments/nns_npzd/base_simulation/"
     filename = "nns_annual.nc"
     fabm_yaml_name = "fabm.yaml"
     gotm_yaml_name = "gotm.yaml"
@@ -463,9 +470,9 @@ def profile_npzd(save_path=None, device="cpu", rollout=False, requires_gradients
     # set up simulation, initialize
 
     initialization_dict = initialize_gotm(
-        path + gotm_yaml_name,
-        path + fabm_yaml_name,
-        path + filename,
+        load_path + gotm_yaml_name,
+        load_path + fabm_yaml_name,
+        load_path + filename,
         model_classes=[GOTMLightModel, GOTMNPZDModel],
         device=device,
         dtype="float64",
@@ -604,10 +611,9 @@ def profile_npzd(save_path=None, device="cpu", rollout=False, requires_gradients
     return times
 
 
-def profile_ecosmo(save_path=None, device="cpu", rollout=False, requires_gradients=False, dif_method=None):
+def profile_ecosmo(load_path, save_path=None, device="cpu", rollout=False, requires_gradients=False, dif_method=None):
     """Measure time and memory costs of advection, diffusion and ECOSMO operators."""
 
-    path = "/gpfs/work/nimtz/experiments/nns_ecosmo/base_simulation/"
     filename = "nns_annual.nc"
     fabm_yaml_name = "fabm.yaml"
     gotm_yaml_name = "gotm.yaml"
@@ -620,9 +626,9 @@ def profile_ecosmo(save_path=None, device="cpu", rollout=False, requires_gradien
     # set up simulation, initialize
 
     initialization_dict = initialize_gotm(
-        path + gotm_yaml_name,
-        path + fabm_yaml_name,
-        path + filename,
+        load_path + gotm_yaml_name,
+        load_path + fabm_yaml_name,
+        load_path + filename,
         model_classes=[GOTMLightModel, NerscEcosmoModel],
         device=device,
         dtype="float64",
@@ -774,14 +780,27 @@ def profile_ecosmo(save_path=None, device="cpu", rollout=False, requires_gradien
 if __name__ == "__main__":
     print("running on node", os.environ.get("SLURMD_NODENAME"))
 
+    base_folder = "/gpfs/work/nimtz/zenodo/"  # the directory of your Zenodo download
+
+    # device: "cpu" or "cuda"
+    # rollout: False or True
+    #   if False, compute one parallel time step, where time is treated as a batch dimension
+    #   if True, compute a sequential rollout over all time steps
+    # dif_method: "thomas", "paracr" or "linalg"
+    #   the tridiagonal solvers supported by MARINADE
+    #   for further information, please consult the MARINADE documentation or paper
+    # NPZD or ECOSMO: please comment / uncomment the corresponding function calls to choose the BGC model
+
     profile_npzd(
-        "/gpfs/work/nimtz/experiments/nns_npzd/base_simulation/performance_profiling/",
+        load_path=base_folder + "marinade_github_forcing_data/nns_npzd/base_simulation_5y/",
+        save_path=base_folder + "marinade_github_forcing_data/nns_npzd/base_simulation_5y/performance_profiling/",
         device="cuda",
         rollout=False,
         dif_method="thomas",
     )
     # profile_ecosmo(
-    #     '/gpfs/work/nimtz/experiments/nns_ecosmo/base_simulation/performance_profiling/',
+    #     load_path=base_folder+"marinade_github_forcing_data/nns_ecosmo/base_simulation_5y/",
+    #     save_path=base_folder+"marinade_github_forcing_data/nns_ecosmo/base_simulation_5y/performance_profiling/',
     #     device='cuda',
     #     rollout=False,
     #     dif_method='thomas'
