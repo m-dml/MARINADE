@@ -15,9 +15,9 @@ sys.path.insert(0, os.path.abspath("../../marinade"))
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
 project = "MARINADE"
-copyright = "2025, m-dml team"
+copyright = "2026, m-dml team"
 author = "m-dml team"
-release = "0.1.0"
+release = "1.0.0"
 
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
@@ -39,19 +39,33 @@ extensions = [
 add_module_names = True
 toc_object_entries_show_parents = "hide"
 templates_path = ["_templates"]
-exclude_patterns = ["../../marinade/_version.py"]
+exclude_patterns = ["../marinade/_version.py"]
 autosummary_generate = True
 
 
 # --- Autodoc ---------------------------------------------------------------
 
 
+autodoc_mock_imports = [
+    "torch",
+    "numpy",
+    "pandas",
+    "sklearn",
+    "numpy",
+    "tensordict",
+    "textwrap",
+    "warnings",
+    "abc",
+    "scipy",
+    "jax",
+]
+
 autodoc_default_options = {
-    "members": True,
+    # "members": True,
     "member-order": "groupwise",
-    "undoc-members": True,
+    # "undoc-members": True,
     "exclude-members": "__weakref__, __init__",
-    "show-inheritance": True,
+    # "show-inheritance": True,
 }
 
 autoclass_content = "class"
@@ -61,7 +75,7 @@ autodoc_inherit_docstrings = False
 # -- Options for HTML output -------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output
 
-html_theme = "sphinx_typo3_theme"
+# html_theme = "sphinx_typo3_theme"
 
 # # -- Intersphinx options
 # intersphinx_mapping = {
@@ -76,17 +90,16 @@ html_favicon = "images/m-dml_logo_dark.png"
 
 def cleanup():
     """Delete the _autosummary folder before building the documentation."""
-    if not os.path.exists(os.path.join(os.getcwd(), "source", "_autosummary")):
+    if not os.path.exists(os.path.join(os.getcwd(), "_sources", "_autosummary")):
         return
     print(f"Cleaning up _autosummary folder in {os.getcwd()}")
-    shutil.rmtree(os.path.join(os.getcwd(), "source", "_autosummary"))
-
+    shutil.rmtree(os.path.join(os.getcwd(), "_sources", "_autosummary"))
 
 def change_content_of_main_generated_index(app, what, name, obj, options, lines):
     """Add text to the main index page."""
     if what == "module":
         if name == "marinade":
-            lines.insert(0, "Api reference for da_tools-tools.")
+            lines.insert(0, "API reference for MARINADE.")
             print("")
 
 
