@@ -1,0 +1,6 @@
+diffuse\_at\_center
+===================
+
+.. currentmodule:: marinade.gotm.diffusion
+
+.. autofunction:: diffuse_at_center

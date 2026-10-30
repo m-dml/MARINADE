@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../../../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>marinade.fabm.gotm_light_model &#8212; MARINADE 1.0.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=5ecbeea2" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/basic.css?v=b08954a9" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/alabaster.css?v=27fed22d" />
+    <script src="../../../_static/documentation_options.js?v=8d563738"></script>
+    <script src="../../../_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <link rel="icon" href="../../../_static/m-dml_logo_dark.png"/>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" />
+   
+  <link rel="stylesheet" href="../../../_static/custom.css" type="text/css" />
+  
+
+  
+  
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <h1>Source code for marinade.fabm.gotm_light_model</h1><div class="highlight"><pre>
+<span></span><span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">List</span><span class="p">,</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Union</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">yaml</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">marinade.fabm.base_model</span><span class="w"> </span><span class="kn">import</span> <span class="n">BaseModel</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">marinade.util.temporal_mean</span><span class="w"> </span><span class="kn">import</span> <span class="n">TemporalMean</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">tensordict</span><span class="w"> </span><span class="kn">import</span> <span class="n">TensorDict</span>
+
+
+<div class="viewcode-block" id="GOTMLightModel">
+<a class="viewcode-back" href="../../../_autosummary/marinade.fabm.gotm_light_model.GOTMLightModel.html#marinade.fabm.gotm_light_model.GOTMLightModel">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">GOTMLightModel</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;This class provides a light model that can be used with biogeochemical models. It takes the incoming short-wave</span>
+<span class="sd">    radiation as input and computes the photosynthetically active radiation at the water surface and in the water.</span>
+
+<span class="sd">    This model can be coupled to another biomodel through GOTMLightModel.couple(model), see below.</span>
+
+<span class="sd">    Some biosystem models require temporal light averages, typically over 24 hours.</span>
+<span class="sd">    These can be computed with this light model with a moving 24 hour time window or as exponential smoothing.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        a (Union[float, torch.Tensor]): Fraction of the incoming radiation that is not photosynthetically active.</span>
+<span class="sd">        g1 (Union[float, torch.Tensor]): Light extinction length for radiation that is not photosynthetically active.</span>
+<span class="sd">        g2 (Union[float, torch.Tensor]): Light extinction length for photosynthetically active radiation.</span>
+<span class="sd">        tempmean_method (str, optional): Method for evaluating temporal means of the light fields.</span>
+<span class="sd">            Possible options: (&quot;running_mean_strict&quot;, &quot;exponential_mean&quot;). Defaults to None.</span>
+<span class="sd">        compute_surface_par (bool, optional): If False, the surface photoactive radiation is set to the value of</span>
+<span class="sd">            the full light input. If True, it is reduced according to the *a* coefficient. Defaults to True.</span>
+<span class="sd">        model_name (str, optional): The name of the model. Defaults to &quot;light&quot;.</span>
+<span class="sd">        device (str, optional): The device where the tensors of the model should be stored. Defaults to &quot;cpu&quot;.</span>
+<span class="sd">        dtype (torch.dtype, optional): The default data type of the model. Defaults to torch.float64.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">a</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">],</span>
+        <span class="n">g1</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">],</span>
+        <span class="n">g2</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">],</span>
+        <span class="n">tempmean_method</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">compute_surface_par</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+        <span class="n">model_name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;light&quot;</span><span class="p">,</span>
+        <span class="n">device</span><span class="o">=</span><span class="s2">&quot;cpu&quot;</span><span class="p">,</span>
+        <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">float64</span><span class="p">,</span>
+        <span class="o">*</span><span class="n">args</span><span class="p">,</span>
+        <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
+    <span class="p">):</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">dtype</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+            <span class="n">dtype</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">torch</span><span class="p">,</span> <span class="n">dtype</span><span class="p">)</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">model_name</span><span class="o">=</span><span class="n">model_name</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;light_a&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">a</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">)</span> <span class="k">else</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;light_g1&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="n">g1</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">g1</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">)</span> <span class="k">else</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="n">g1</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">)</span>
+        <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;light_g2&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="n">g2</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">g2</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">)</span> <span class="k">else</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="n">g2</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">)</span>
+        <span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">light_attenuation_indexes</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">coupled_model</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">tempmean_method</span> <span class="o">=</span> <span class="n">tempmean_method</span>
+        <span class="k">if</span> <span class="n">tempmean_method</span> <span class="o">==</span> <span class="s2">&quot;running_mean_strict&quot;</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">temporal_mean_par0</span> <span class="o">=</span> <span class="n">TemporalMean</span><span class="p">(</span>
+                <span class="n">variable</span><span class="o">=</span><span class="s2">&quot;light_par0&quot;</span><span class="p">,</span> <span class="n">period</span><span class="o">=</span><span class="mf">86400.0</span><span class="p">,</span> <span class="n">resolution</span><span class="o">=</span><span class="mf">3600.0</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span>
+            <span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">temporal_mean_par</span> <span class="o">=</span> <span class="n">TemporalMean</span><span class="p">(</span>
+                <span class="n">variable</span><span class="o">=</span><span class="s2">&quot;light_par&quot;</span><span class="p">,</span> <span class="n">period</span><span class="o">=</span><span class="mf">86400.0</span><span class="p">,</span> <span class="n">resolution</span><span class="o">=</span><span class="mf">3600.0</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span>
+            <span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">dependencies</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">&quot;time&quot;</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="n">tempmean_method</span> <span class="o">==</span> <span class="s2">&quot;exponential_mean&quot;</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">light_mean_tau</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="mf">90500.0</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">compute_surface_par</span> <span class="o">=</span> <span class="n">compute_surface_par</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">dependencies</span><span class="o">.</span><span class="n">extend</span><span class="p">([</span><span class="s2">&quot;I_0&quot;</span><span class="p">,</span> <span class="s2">&quot;zeta&quot;</span><span class="p">,</span> <span class="s2">&quot;z&quot;</span><span class="p">,</span> <span class="s2">&quot;h&quot;</span><span class="p">])</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">output_fields</span><span class="o">.</span><span class="n">extend</span><span class="p">([</span><span class="s2">&quot;light_swr&quot;</span><span class="p">,</span> <span class="s2">&quot;light_par&quot;</span><span class="p">,</span> <span class="s2">&quot;light_par0&quot;</span><span class="p">])</span>
+        <span class="k">if</span> <span class="n">tempmean_method</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">output_fields</span><span class="o">.</span><span class="n">extend</span><span class="p">([</span><span class="s2">&quot;light_par_mean&quot;</span><span class="p">,</span> <span class="s2">&quot;light_par0_mean&quot;</span><span class="p">])</span>
+
+<div class="viewcode-block" id="GOTMLightModel.register_light_coupling">
+<a class="viewcode-back" href="../../../_autosummary/marinade.fabm.gotm_light_model.GOTMLightModel.html#marinade.fabm.gotm_light_model.GOTMLightModel.register_light_coupling">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">register_light_coupling</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">light_attenuation_indexes</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">int</span><span class="p">],</span>
+        <span class="n">light_attenuation_scale_factor</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="nb">float</span><span class="p">],</span>
+        <span class="n">light_attenuation_background</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span>
+    <span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Registers attenuation indexes, scale factors and background for dynamic light attenuation based on the tracer</span>
+<span class="sd">        state.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            light_attenuation_indexes (list of int): The indexes of the tracers that contribute to light attenuation</span>
+<span class="sd">            light_attenuation_scale_factor (Union[torch.Tensor, float]): The scale factor for light attenuation</span>
+<span class="sd">                of individual tracers. Can be scalar or vector, in case different tracers have varying contributions.</span>
+<span class="sd">            light_attenuation_background (float): The light attenuation background</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">light_attenuation_indexes</span> <span class="o">=</span> <span class="n">light_attenuation_indexes</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">light_attenuation_scale_factor</span> <span class="o">=</span> <span class="n">light_attenuation_scale_factor</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">light_attenuation_background</span> <span class="o">=</span> <span class="n">light_attenuation_background</span></div>
+
+
+<div class="viewcode-block" id="GOTMLightModel.couple">
+<a class="viewcode-back" href="../../../_autosummary/marinade.fabm.gotm_light_model.GOTMLightModel.html#marinade.fabm.gotm_light_model.GOTMLightModel.couple">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">couple</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">model</span><span class="p">:</span> <span class="n">BaseModel</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Couples this light model with another biosystem model.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            model (BaseModel): The model to which this model should be coupled.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            ValueError: An error is raised in case the coupled model does not have the required fields</span>
+<span class="sd">                light_attenuation_indexes, light_attenuation_scale_factor, light_attenuation_background</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            BaseModel: This model, which is now a coupled model.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">coupled_model</span> <span class="o">=</span> <span class="n">model</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">tracer_names</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">tracer_names</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">register_light_coupling</span><span class="p">(</span>
+                <span class="n">model</span><span class="o">.</span><span class="n">light_attenuation_indexes</span><span class="p">,</span>
+                <span class="n">model</span><span class="o">.</span><span class="n">light_attenuation_scale_factor</span><span class="p">,</span>
+                <span class="n">model</span><span class="o">.</span><span class="n">light_attenuation_background</span><span class="p">,</span>
+            <span class="p">)</span>
+        <span class="k">except</span> <span class="p">(</span><span class="ne">KeyError</span><span class="p">,</span> <span class="ne">ValueError</span><span class="p">,</span> <span class="ne">TypeError</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="s2">&quot;Coupling the light model did not work!&quot;</span>
+                <span class="s2">&quot;Please make sure that the coupled model has the attributes&quot;</span>
+                <span class="s2">&quot;light_attenuation_indexes (list), light_attenuation_scale_factor (float),&quot;</span>
+                <span class="s2">&quot;and light_attenuation_background (float).&quot;</span>
+            <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">do_repair_state</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">do_repair_state</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">get_vertical_movement</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">get_vertical_movement</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">repair_state</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">repair_state</span>
+        <span class="k">return</span> <span class="bp">self</span></div>
+
+
+<div class="viewcode-block" id="GOTMLightModel.create_model_from_yaml_file">
+<a class="viewcode-back" href="../../../_autosummary/marinade.fabm.gotm_light_model.GOTMLightModel.html#marinade.fabm.gotm_light_model.GOTMLightModel.create_model_from_yaml_file">[docs]</a>
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">create_model_from_yaml_file</span><span class="p">(</span>
+        <span class="bp">cls</span><span class="p">,</span>
+        <span class="n">path_fabm</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">path_gotm</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">tempmean_method</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">device</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;cpu&quot;</span><span class="p">,</span>
+        <span class="n">dtype</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">dtype</span><span class="p">]</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">float64</span><span class="p">,</span>
+        <span class="o">*</span><span class="n">args</span><span class="p">,</span>
+        <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
+    <span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Creates a *GOTM_Light_Model* instance from .yaml configuration files. Designed to be compatible with the</span>
+<span class="sd">        configuration files of GOTM.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            path_fabm (str): Path to the FABM .yaml configuration file</span>
+<span class="sd">            path_gotm (str): Path to the GOTM .yaml configuration file</span>
+<span class="sd">            tempmean_method (str, optional): Method for evaluating temporal means of the light fields.</span>
+<span class="sd">                Possible options: (&quot;running_mean_strict&quot;, &quot;exponential_mean&quot;). Defaults to None.</span>
+<span class="sd">            device (str): Torch device. Defaults to &quot;cpu&quot;.</span>
+<span class="sd">            dtype (Union[str, torch.dtype]): Torch data type. Defaults to torch.float64.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            GOTMLightModel: The generated model</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">dtype</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+            <span class="n">dtype</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">torch</span><span class="p">,</span> <span class="n">dtype</span><span class="p">)</span>
+
+        <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">path_fabm</span><span class="p">,</span> <span class="s2">&quot;r&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">file_fabm</span><span class="p">:</span>
+            <span class="n">config_fabm</span> <span class="o">=</span> <span class="n">yaml</span><span class="o">.</span><span class="n">safe_load</span><span class="p">(</span><span class="n">file_fabm</span><span class="p">)</span>
+
+        <span class="n">_model_detected</span> <span class="o">=</span> <span class="kc">False</span>
+
+        <span class="n">model_name</span> <span class="o">=</span> <span class="s2">&quot;light&quot;</span>
+
+        <span class="k">for</span> <span class="n">name_instance</span><span class="p">,</span> <span class="n">config_instance</span> <span class="ow">in</span> <span class="n">config_fabm</span><span class="p">[</span><span class="s2">&quot;instances&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="k">if</span> <span class="n">config_instance</span><span class="p">[</span><span class="s2">&quot;model&quot;</span><span class="p">]</span> <span class="o">==</span> <span class="s2">&quot;gotm/light&quot;</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">_model_detected</span><span class="p">:</span>
+                    <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;More than one light model detected in file </span><span class="si">{</span><span class="n">file_fabm</span><span class="si">}</span><span class="s2">!&quot;</span><span class="p">)</span>
+                <span class="n">model_name</span> <span class="o">=</span> <span class="n">name_instance</span>
+                <span class="n">_model_detected</span> <span class="o">=</span> <span class="kc">True</span>
+                <span class="k">try</span><span class="p">:</span>
+                    <span class="n">a</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="n">config_instance</span><span class="p">[</span><span class="s2">&quot;parameters&quot;</span><span class="p">][</span><span class="s2">&quot;a&quot;</span><span class="p">],</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">)</span>
+                <span class="k">except</span> <span class="p">(</span><span class="ne">KeyError</span><span class="p">,</span> <span class="ne">ValueError</span><span class="p">,</span> <span class="ne">TypeError</span><span class="p">):</span>
+                    <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                        <span class="sa">f</span><span class="s2">&quot;instances/</span><span class="si">{</span><span class="n">name_instance</span><span class="si">}</span><span class="s2">/parameters/a missing or invalid in </span><span class="si">{</span><span class="n">path_fabm</span><span class="si">}</span><span class="s2">. &quot;</span>
+                        <span class="o">+</span> <span class="s2">&quot;Expected type float. The suggested default value is 0.58.&quot;</span>
+                    <span class="p">)</span>
+                <span class="k">try</span><span class="p">:</span>
+                    <span class="n">g1</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="n">config_instance</span><span class="p">[</span><span class="s2">&quot;parameters&quot;</span><span class="p">][</span><span class="s2">&quot;g1&quot;</span><span class="p">],</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">)</span>
+                <span class="k">except</span> <span class="p">(</span><span class="ne">KeyError</span><span class="p">,</span> <span class="ne">ValueError</span><span class="p">,</span> <span class="ne">TypeError</span><span class="p">):</span>
+                    <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                        <span class="sa">f</span><span class="s2">&quot;instances/</span><span class="si">{</span><span class="n">name_instance</span><span class="si">}</span><span class="s2">/parameters/g1 missing or invalid in </span><span class="si">{</span><span class="n">path_fabm</span><span class="si">}</span><span class="s2">. &quot;</span>
+                        <span class="o">+</span> <span class="s2">&quot;Expected type float. The suggested default value is 0.35.&quot;</span>
+                    <span class="p">)</span>
+                <span class="k">try</span><span class="p">:</span>
+                    <span class="n">g2</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="n">config_instance</span><span class="p">[</span><span class="s2">&quot;parameters&quot;</span><span class="p">][</span><span class="s2">&quot;g2&quot;</span><span class="p">],</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">)</span>
+                <span class="k">except</span> <span class="p">(</span><span class="ne">KeyError</span><span class="p">,</span> <span class="ne">ValueError</span><span class="p">,</span> <span class="ne">TypeError</span><span class="p">):</span>
+                    <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                        <span class="sa">f</span><span class="s2">&quot;instances/</span><span class="si">{</span><span class="n">name_instance</span><span class="si">}</span><span class="s2">/parameters/g2 missing or invalid in </span><span class="si">{</span><span class="n">path_fabm</span><span class="si">}</span><span class="s2">. &quot;</span>
+                        <span class="o">+</span> <span class="s2">&quot;Expected type float. The suggested default value is 23.0.&quot;</span>
+                    <span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">_model_detected</span><span class="p">:</span>
+            <span class="c1"># model is not specified in fabm.yaml, so use built-in model from gotm.yaml</span>
+            <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">path_gotm</span><span class="p">,</span> <span class="s2">&quot;r&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">file_gotm</span><span class="p">:</span>
+                <span class="n">config_gotm</span> <span class="o">=</span> <span class="n">yaml</span><span class="o">.</span><span class="n">safe_load</span><span class="p">(</span><span class="n">file_gotm</span><span class="p">)</span>
+            <span class="k">if</span> <span class="s2">&quot;light_extinction&quot;</span> <span class="ow">in</span> <span class="n">config_gotm</span><span class="p">:</span>
+                <span class="n">config_light_extinction</span> <span class="o">=</span> <span class="n">config_gotm</span><span class="p">[</span><span class="s2">&quot;light_extinction&quot;</span><span class="p">]</span>
+                <span class="n">method</span> <span class="o">=</span> <span class="n">config_light_extinction</span><span class="p">[</span><span class="s2">&quot;method&quot;</span><span class="p">]</span>
+                <span class="k">if</span> <span class="n">method</span> <span class="o">==</span> <span class="s2">&quot;jerlov-i&quot;</span> <span class="ow">or</span> <span class="n">method</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+                    <span class="n">a</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="mf">0.58</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">)</span>
+                    <span class="n">g1</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="mf">0.35</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">)</span>
+                    <span class="n">g2</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="mf">23.0</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">)</span>
+                <span class="k">elif</span> <span class="n">method</span> <span class="o">==</span> <span class="s2">&quot;jerlov-1-50m&quot;</span> <span class="ow">or</span> <span class="n">method</span> <span class="o">==</span> <span class="mi">2</span><span class="p">:</span>
+                    <span class="n">a</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="mf">0.68</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">)</span>
+                    <span class="n">g1</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="mf">1.20</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">)</span>
+                    <span class="n">g2</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="mf">28.0</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">)</span>
+                <span class="k">elif</span> <span class="n">method</span> <span class="o">==</span> <span class="s2">&quot;jerlov-ia&quot;</span> <span class="ow">or</span> <span class="n">method</span> <span class="o">==</span> <span class="mi">3</span><span class="p">:</span>
+                    <span class="n">a</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="mf">0.62</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">)</span>
+                    <span class="n">g1</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="mf">0.60</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">)</span>
+                    <span class="n">g2</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="mf">20.0</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">)</span>
+                <span class="k">elif</span> <span class="n">method</span> <span class="o">==</span> <span class="s2">&quot;jerlov-ib&quot;</span> <span class="ow">or</span> <span class="n">method</span> <span class="o">==</span> <span class="mi">4</span><span class="p">:</span>
+                    <span class="n">a</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="mf">0.67</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">)</span>
+                    <span class="n">g1</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="mf">1.0</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">)</span>
+                    <span class="n">g2</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="mf">17.0</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">)</span>
+                <span class="k">elif</span> <span class="n">method</span> <span class="o">==</span> <span class="s2">&quot;jerlov-ii&quot;</span> <span class="ow">or</span> <span class="n">method</span> <span class="o">==</span> <span class="mi">5</span><span class="p">:</span>
+                    <span class="n">a</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="mf">0.77</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">)</span>
+                    <span class="n">g1</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="mf">1.5</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">)</span>
+                    <span class="n">g2</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="mf">14.0</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">)</span>
+                <span class="k">elif</span> <span class="n">method</span> <span class="o">==</span> <span class="s2">&quot;jerlov-iii&quot;</span> <span class="ow">or</span> <span class="n">method</span> <span class="o">==</span> <span class="mi">6</span><span class="p">:</span>
+                    <span class="n">a</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="mf">0.78</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">)</span>
+                    <span class="n">g1</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="mf">1.4</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">)</span>
+                    <span class="n">g2</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="mf">7.9</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">)</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="k">if</span> <span class="n">config_light_extinction</span><span class="p">[</span><span class="s2">&quot;A&quot;</span><span class="p">][</span><span class="s2">&quot;method&quot;</span><span class="p">]</span> <span class="o">==</span> <span class="s2">&quot;constant&quot;</span><span class="p">:</span>
+                        <span class="n">a</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="n">config_light_extinction</span><span class="p">[</span><span class="s2">&quot;A&quot;</span><span class="p">][</span><span class="s2">&quot;constant_value&quot;</span><span class="p">],</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">)</span>
+                    <span class="k">else</span><span class="p">:</span>
+                        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s2">&quot;reading the light coefficient A from file is not implemented yet&quot;</span><span class="p">)</span>
+                    <span class="k">if</span> <span class="n">config_light_extinction</span><span class="p">[</span><span class="s2">&quot;g1&quot;</span><span class="p">][</span><span class="s2">&quot;method&quot;</span><span class="p">]</span> <span class="o">==</span> <span class="s2">&quot;constant&quot;</span><span class="p">:</span>
+                        <span class="n">g1</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="n">config_light_extinction</span><span class="p">[</span><span class="s2">&quot;g1&quot;</span><span class="p">][</span><span class="s2">&quot;constant_value&quot;</span><span class="p">],</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">)</span>
+                    <span class="k">else</span><span class="p">:</span>
+                        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s2">&quot;reading the light coefficient g1 from file is not implemented yet&quot;</span><span class="p">)</span>
+                    <span class="k">if</span> <span class="n">config_light_extinction</span><span class="p">[</span><span class="s2">&quot;g2&quot;</span><span class="p">][</span><span class="s2">&quot;method&quot;</span><span class="p">]</span> <span class="o">==</span> <span class="s2">&quot;constant&quot;</span><span class="p">:</span>
+                        <span class="n">g2</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="n">config_light_extinction</span><span class="p">[</span><span class="s2">&quot;g2&quot;</span><span class="p">][</span><span class="s2">&quot;constant_value&quot;</span><span class="p">],</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">)</span>
+                    <span class="k">else</span><span class="p">:</span>
+                        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s2">&quot;reading the light coefficient g2 from file is not implemented yet&quot;</span><span class="p">)</span>
+
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;No light model detected in file </span><span class="si">{</span><span class="n">file_fabm</span><span class="si">}</span><span class="s2"> or </span><span class="si">{</span><span class="n">file_gotm</span><span class="si">}</span><span class="s2">!</span><span class="se">\</span>
+<span class="s2">                        Please specify a light model according to the following</span><span class="se">\</span>
+<span class="s2">                        template:</span><span class="se">\n</span><span class="s2">instances:</span><span class="se">\n</span><span class="s2">  light:</span><span class="se">\n</span><span class="s2">    model: gotm/light</span><span class="se">\n</span><span class="s2">    parameters:</span><span class="se">\n</span><span class="s2">      a   :  0.58  #</span><span class="se">\</span>
+<span class="s2">                        default</span><span class="se">\n</span><span class="s2">      g1  :  0.1  # default</span><span class="se">\n</span><span class="s2">      g2  : 24.00  # default&quot;</span>
+                <span class="p">)</span>
+
+        <span class="n">model</span> <span class="o">=</span> <span class="bp">cls</span><span class="p">(</span>
+            <span class="n">a</span><span class="p">,</span>
+            <span class="n">g1</span><span class="p">,</span>
+            <span class="n">g2</span><span class="p">,</span>
+            <span class="n">tempmean_method</span><span class="o">=</span><span class="n">tempmean_method</span><span class="p">,</span>
+            <span class="n">compute_surface_par</span><span class="o">=</span><span class="n">_model_detected</span><span class="p">,</span>
+            <span class="n">model_name</span><span class="o">=</span><span class="n">model_name</span><span class="p">,</span>
+            <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span>
+            <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">,</span>
+            <span class="o">*</span><span class="n">args</span><span class="p">,</span>
+            <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">model</span></div>
+
+
+<div class="viewcode-block" id="GOTMLightModel.get_parameters">
+<a class="viewcode-back" href="../../../_autosummary/marinade.fabm.gotm_light_model.GOTMLightModel.html#marinade.fabm.gotm_light_model.GOTMLightModel.get_parameters">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_parameters</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Retrieve the parameters of the light model. If another model is coupled, retrieve the parameters of both</span>
+<span class="sd">        models as one TensorDict.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            (TensorDict): The model parameters</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">coupled_model</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">get_parameters</span><span class="p">()</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">return</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">get_parameters</span><span class="p">()</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">coupled_model</span><span class="o">.</span><span class="n">get_parameters</span><span class="p">())</span></div>
+
+
+<div class="viewcode-block" id="GOTMLightModel.update_parameters">
+<a class="viewcode-back" href="../../../_autosummary/marinade.fabm.gotm_light_model.GOTMLightModel.html#marinade.fabm.gotm_light_model.GOTMLightModel.update_parameters">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">update_parameters</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">parameters</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Update the parameters of the light model. If another model is coupled, update the parameter of the respective</span>
+<span class="sd">        model for each new value.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            parameters (TensorDict): The model parameters to be updated</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">coupled_model</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">update_parameters</span><span class="p">(</span><span class="n">parameters</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">update_parameters</span><span class="p">(</span><span class="n">parameters</span><span class="o">.</span><span class="n">select</span><span class="p">(</span><span class="o">*</span><span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="o">.</span><span class="n">keys</span><span class="p">(),</span> <span class="n">strict</span><span class="o">=</span><span class="kc">False</span><span class="p">))</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">coupled_model</span><span class="o">.</span><span class="n">update_parameters</span><span class="p">(</span><span class="n">parameters</span><span class="o">.</span><span class="n">exclude</span><span class="p">(</span><span class="o">*</span><span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="o">.</span><span class="n">keys</span><span class="p">()))</span>
+
+            <span class="bp">self</span><span class="o">.</span><span class="n">register_light_coupling</span><span class="p">(</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">coupled_model</span><span class="o">.</span><span class="n">light_attenuation_indexes</span><span class="p">,</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">coupled_model</span><span class="o">.</span><span class="n">light_attenuation_scale_factor</span><span class="p">,</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">coupled_model</span><span class="o">.</span><span class="n">light_attenuation_background</span><span class="p">,</span>
+            <span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="GOTMLightModel.forward">
+<a class="viewcode-back" href="../../../_autosummary/marinade.fabm.gotm_light_model.GOTMLightModel.html#marinade.fabm.gotm_light_model.GOTMLightModel.forward">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">forward</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">concentration</span><span class="p">:</span> <span class="n">TensorDict</span><span class="p">,</span> <span class="n">dt</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">dynamic_inputs</span><span class="p">:</span> <span class="n">TensorDict</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">TensorDict</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Compute the NPZD model time step based on the momentary state. Might require additional forcing inputs, e.g.</span>
+<span class="sd">        incoming radiation.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            concentration (TensorDict): The current tracer concentrations. Should have the field:</span>
+<span class="sd">              - &quot;pelagic&quot;: The pelagic tracer concentrations. [batch, tracer, nlev]</span>
+<span class="sd">            dt (float): The time step of the simulation.</span>
+<span class="sd">            dynamic_inputs (TensorDict): Dict of inputs. Should have the fields:</span>
+<span class="sd">              - &quot;I_0&quot;: Incoming surface radiation. [batch]</span>
+<span class="sd">              - &quot;zeta&quot;: Water surface elevation. [batch]</span>
+<span class="sd">              - &quot;z&quot;: Vertical coordinates at cell centers. [batch, nlev]</span>
+<span class="sd">              - &quot;h&quot;: Vertical layer heights. [batch, 1, nlev] or [batch, nlev]</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            TensorDict: The new tracer concentration field. Adds/updates the fields:</span>
+<span class="sd">              - &quot;light_swr&quot;: Shortwave radiation. [batch, nlev]</span>
+<span class="sd">              - &quot;light_par&quot;: Photosynthetically active radiation. [batch, nlev]</span>
+<span class="sd">              - &quot;light_par0&quot;: Surface photosynthetically active radiation. [batch, nlev]</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">concentration</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">compute_light</span><span class="p">(</span><span class="n">concentration</span><span class="p">,</span> <span class="n">dt</span><span class="p">,</span> <span class="n">dynamic_inputs</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">coupled_model</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">concentration</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">coupled_model</span><span class="p">(</span><span class="n">concentration</span><span class="p">,</span> <span class="n">dt</span><span class="p">,</span> <span class="n">dynamic_inputs</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">concentration</span></div>
+
+
+<div class="viewcode-block" id="GOTMLightModel.compute_light">
+<a class="viewcode-back" href="../../../_autosummary/marinade.fabm.gotm_light_model.GOTMLightModel.html#marinade.fabm.gotm_light_model.GOTMLightModel.compute_light">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">compute_light</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">concentration</span><span class="p">:</span> <span class="n">TensorDict</span><span class="p">,</span> <span class="n">dt</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">dynamic_inputs</span><span class="p">:</span> <span class="n">TensorDict</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">TensorDict</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Compute the light distribution based on incoming surface radiation and water and tracer attenuation.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            concentration (TensorDict): The current tracer concentrations. Should have the field:</span>
+<span class="sd">              - &quot;pelagic&quot;: The pelagic tracer concentrations. [batch, tracer, nlev]</span>
+<span class="sd">            dt (float): The time step of the simulation.</span>
+<span class="sd">            dynamic_inputs (TensorDict): Dict of inputs. Should have the fields:</span>
+<span class="sd">              - &quot;I_0&quot;: Incoming surface radiation. [batch]</span>
+<span class="sd">              - &quot;zeta&quot;: Water surface elevation. [batch]</span>
+<span class="sd">              - &quot;z&quot;: Vertical coordinates at cell centers. [batch, nlev]</span>
+<span class="sd">              - &quot;h&quot;: Vertical layer heights. [batch, 1, nlev] or [batch, nlev]</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            TensorDict: The new tracer concentration field. Adds/updates the fields:</span>
+<span class="sd">              - &quot;light_swr&quot;: Shortwave radiation. [batch, nlev]</span>
+<span class="sd">              - &quot;light_par&quot;: Photosynthetically active radiation. [batch, nlev]</span>
+<span class="sd">              - &quot;light_par0&quot;: Surface photosynthetically active radiation. [batch, nlev]</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">swr0</span> <span class="o">=</span> <span class="n">dynamic_inputs</span><span class="p">[</span><span class="s2">&quot;I_0&quot;</span><span class="p">]</span>
+
+        <span class="n">zeta</span> <span class="o">=</span> <span class="n">dynamic_inputs</span><span class="p">[</span><span class="s2">&quot;zeta&quot;</span><span class="p">]</span>
+        <span class="n">z</span> <span class="o">=</span> <span class="n">dynamic_inputs</span><span class="p">[</span><span class="s2">&quot;z&quot;</span><span class="p">]</span>
+        <span class="n">h</span> <span class="o">=</span> <span class="n">dynamic_inputs</span><span class="p">[</span><span class="s2">&quot;h&quot;</span><span class="p">]</span>
+        <span class="k">if</span> <span class="n">h</span><span class="o">.</span><span class="n">ndim</span> <span class="o">&gt;</span> <span class="n">z</span><span class="o">.</span><span class="n">ndim</span><span class="p">:</span>
+            <span class="n">h</span> <span class="o">=</span> <span class="n">h</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="p">:]</span>
+        <span class="k">if</span> <span class="n">zeta</span><span class="o">.</span><span class="n">ndim</span> <span class="o">&lt;</span> <span class="n">z</span><span class="o">.</span><span class="n">ndim</span><span class="p">:</span>
+            <span class="n">zeta</span> <span class="o">=</span> <span class="n">zeta</span><span class="o">.</span><span class="n">unsqueeze</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+        <span class="n">z</span> <span class="o">=</span> <span class="n">z</span> <span class="o">-</span> <span class="n">zeta</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">light_attenuation_indexes</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">ext</span> <span class="o">=</span> <span class="n">concentration</span><span class="p">[</span><span class="s2">&quot;pelagic&quot;</span><span class="p">][</span><span class="o">...</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">light_attenuation_indexes</span><span class="p">,</span> <span class="p">:]</span>
+            <span class="c1"># [..., tracer, z]</span>
+            <span class="n">ext</span> <span class="o">=</span> <span class="n">ext</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">light_attenuation_scale_factor</span>
+            <span class="n">ext</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">ext</span><span class="p">,</span> <span class="n">dim</span><span class="o">=-</span><span class="mi">2</span><span class="p">)</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">light_attenuation_background</span>
+            <span class="c1"># [..., z]</span>
+            <span class="c1"># z index starts at bottom and goes up</span>
+            <span class="n">ext</span> <span class="o">=</span> <span class="n">ext</span> <span class="o">*</span> <span class="n">h</span>
+
+            <span class="n">ext_cumsum</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">cumsum</span><span class="p">(</span><span class="n">ext</span><span class="o">.</span><span class="n">flip</span><span class="p">(</span><span class="n">dims</span><span class="o">=</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,)),</span> <span class="n">dim</span><span class="o">=-</span><span class="mi">1</span><span class="p">)</span><span class="o">.</span><span class="n">flip</span><span class="p">(</span><span class="n">dims</span><span class="o">=</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,))</span>
+
+            <span class="n">bioext</span> <span class="o">=</span> <span class="n">ext_cumsum</span> <span class="o">-</span> <span class="mf">0.5</span> <span class="o">*</span> <span class="n">ext</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">bioext</span> <span class="o">=</span> <span class="mf">0.0</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">compute_surface_par</span><span class="p">:</span>
+            <span class="n">par0</span> <span class="o">=</span> <span class="n">swr0</span> <span class="o">*</span> <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;light_a&quot;</span><span class="p">])</span>
+            <span class="n">par</span> <span class="o">=</span> <span class="n">par0</span><span class="o">.</span><span class="n">unsqueeze</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span> <span class="o">*</span> <span class="n">torch</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="n">z</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;light_g2&quot;</span><span class="p">]</span> <span class="o">-</span> <span class="n">bioext</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">par0</span> <span class="o">=</span> <span class="n">swr0</span>
+            <span class="n">par</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="n">par0</span><span class="o">.</span><span class="n">unsqueeze</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+                <span class="o">*</span> <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;light_a&quot;</span><span class="p">])</span>
+                <span class="o">*</span> <span class="n">torch</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="n">z</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;light_g2&quot;</span><span class="p">]</span> <span class="o">-</span> <span class="n">bioext</span><span class="p">)</span>
+            <span class="p">)</span>
+        <span class="n">swr</span> <span class="o">=</span> <span class="n">par</span> <span class="o">+</span> <span class="n">swr0</span><span class="o">.</span><span class="n">unsqueeze</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;light_a&quot;</span><span class="p">]</span> <span class="o">*</span> <span class="n">torch</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="n">z</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;light_g1&quot;</span><span class="p">])</span>
+
+        <span class="n">concentration</span><span class="p">[</span><span class="s2">&quot;light_swr&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">swr</span>
+        <span class="n">concentration</span><span class="p">[</span><span class="s2">&quot;light_par&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">par</span>
+        <span class="n">concentration</span><span class="p">[</span><span class="s2">&quot;light_par0&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">par0</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">tempmean_method</span> <span class="o">==</span> <span class="s2">&quot;running_mean_strict&quot;</span><span class="p">:</span>
+            <span class="n">concentration</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">temporal_mean_par0</span><span class="o">.</span><span class="n">forward</span><span class="p">(</span><span class="n">concentration</span><span class="p">,</span> <span class="n">dt</span><span class="p">,</span> <span class="n">dynamic_inputs</span><span class="p">)</span>
+            <span class="n">concentration</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">temporal_mean_par</span><span class="o">.</span><span class="n">forward</span><span class="p">(</span><span class="n">concentration</span><span class="p">,</span> <span class="n">dt</span><span class="p">,</span> <span class="n">dynamic_inputs</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">tempmean_method</span> <span class="o">==</span> <span class="s2">&quot;exponential_mean&quot;</span><span class="p">:</span>
+            <span class="n">one_minus_alpha</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="o">-</span><span class="n">dt</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">light_mean_tau</span><span class="p">)</span>
+            <span class="n">alpha</span> <span class="o">=</span> <span class="mf">1.0</span> <span class="o">-</span> <span class="n">one_minus_alpha</span>
+            <span class="k">if</span> <span class="s2">&quot;light_par_mean&quot;</span> <span class="ow">in</span> <span class="n">concentration</span><span class="p">:</span>
+                <span class="n">concentration</span><span class="p">[</span><span class="s2">&quot;light_par_mean&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">one_minus_alpha</span> <span class="o">*</span> <span class="n">concentration</span><span class="p">[</span><span class="s2">&quot;light_par_mean&quot;</span><span class="p">]</span> <span class="o">+</span> <span class="n">alpha</span> <span class="o">*</span> <span class="n">par</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">concentration</span><span class="p">[</span><span class="s2">&quot;light_par_mean&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">par</span>
+            <span class="k">if</span> <span class="s2">&quot;light_par0_mean&quot;</span> <span class="ow">in</span> <span class="n">concentration</span><span class="p">:</span>
+                <span class="n">concentration</span><span class="p">[</span><span class="s2">&quot;light_par0_mean&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">one_minus_alpha</span> <span class="o">*</span> <span class="n">concentration</span><span class="p">[</span><span class="s2">&quot;light_par0_mean&quot;</span><span class="p">]</span> <span class="o">+</span> <span class="n">alpha</span> <span class="o">*</span> <span class="n">par0</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">concentration</span><span class="p">[</span><span class="s2">&quot;light_par0_mean&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">par0</span>
+
+        <span class="k">return</span> <span class="n">concentration</span></div>
+
+
+    <span class="fm">__call__</span> <span class="o">=</span> <span class="n">forward</span></div>
+
+</pre></div>
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../../../index.html">
+              <img class="logo" src="../../../_static/m-dml_logo_banner_cropped.png" alt="Logo of MARINADE"/>
+            </a></p>
+<h1 class="logo"><a href="../../../index.html">MARINADE</a></h1>
+
+
+
+
+
+
+
+
+
+<search id="searchbox" style="display: none" role="search">
+    <div class="searchformwrapper">
+    <form class="search" action="../../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Search"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script><h3>Navigation</h3>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../index.html">Documentation of MARINADE</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../backward.html">Tridiagonal Backward Pass</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../backward.html#tridiagonal-forward-pass">Tridiagonal Forward Pass</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../_autosummary/marinade.html">marinade</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../../../index.html">Documentation overview</a><ul>
+  <li><a href="../../index.html">Module code</a><ul>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &#169;2026, m-dml team.
+      
+      |
+      Powered by <a href="https://www.sphinx-doc.org/">Sphinx 9.2.0</a>
+      &amp; <a href="https://alabaster.readthedocs.io">Alabaster 1.0.0</a>
+      
+    </div>
+
+    
+
+    
+  </body>
+</html>

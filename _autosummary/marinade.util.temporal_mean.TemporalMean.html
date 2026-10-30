@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>TemporalMean &#8212; MARINADE 1.0.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=5ecbeea2" />
+    <link rel="stylesheet" type="text/css" href="../_static/basic.css?v=b08954a9" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css?v=27fed22d" />
+    <script src="../_static/documentation_options.js?v=8d563738"></script>
+    <script src="../_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <link rel="icon" href="../_static/m-dml_logo_dark.png"/>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="prev" title="temporal_mean" href="marinade.util.temporal_mean.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+
+  
+  
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="temporalmean">
+<h1>TemporalMean<a class="headerlink" href="#temporalmean" title="Link to this heading">¶</a></h1>
+<dl class="py class">
+<dt class="sig sig-object py" id="marinade.util.temporal_mean.TemporalMean">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">marinade.util.temporal_mean.</span></span><span class="sig-name descname"><span class="pre">TemporalMean</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">variable</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">period</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">resolution</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">use_incomplete_result</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/marinade/util/temporal_mean.html#TemporalMean"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#marinade.util.temporal_mean.TemporalMean" title="Link to this definition">¶</a></dt>
+<dd><p>Class for keeping track of average values of variables.</p>
+<p>Each TemporalMean keeps track of one variable / key in a TensorDict specified at initialization.</p>
+<p>Note that all information on the variable history is stored in the state itself. Thus, an instance of this class
+does not need to be applied in a “chronological order” for keeping track of the mean values.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>variable</strong> (<em>str</em>) – The name of the variable to average.</p></li>
+<li><p><strong>period</strong> (<em>float</em>) – The period over which to compute the means.</p></li>
+<li><p><strong>resolution</strong> (<em>float</em>) – Length of time bins over which mean values are stored in order to reduce memory costs.</p></li>
+<li><p><strong>use_incomplete_result</strong> (<em>bool</em><em>, </em><em>optional</em>) – Whether to take means over smaller periods
+for shorter histories. Defaults to True.</p></li>
+</ul>
+</dd>
+</dl>
+<p class="rubric">Methods</p>
+<table class="autosummary longtable docutils align-default">
+<tbody>
+<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">__init__</span></code>(variable, period, resolution[, ...])</p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#marinade.util.temporal_mean.TemporalMean.forward" title="marinade.util.temporal_mean.TemporalMean.forward"><code class="xref py py-obj docutils literal notranslate"><span class="pre">forward</span></code></a>(concentration, dt, dynamic_inputs, ...)</p></td>
+<td><p>Calculate the next mean value.</p></td>
+</tr>
+</tbody>
+</table>
+<dl class="py method">
+<dt class="sig sig-object py" id="marinade.util.temporal_mean.TemporalMean.forward">
+<span class="sig-name descname"><span class="pre">forward</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">concentration</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">tensordict.TensorDict</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dt</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dynamic_inputs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">tensordict.TensorDict</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">tensordict.TensorDict</span></span></span><a class="reference internal" href="../_modules/marinade/util/temporal_mean.html#TemporalMean.forward"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#marinade.util.temporal_mean.TemporalMean.forward" title="Link to this definition">¶</a></dt>
+<dd><p>Calculate the next mean value.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>concentration</strong> (<em>TensorDict</em>) – The state for which the time average should be updated.</p></li>
+<li><p><strong>dt</strong> (<em>float</em>) – Time step of the simulation. Required for time averaging.</p></li>
+<li><p><strong>dynamic_inputs</strong> (<em>TensorDict</em>) – Additional inputs. Has to contain the key “t” for time since simulation start.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>The state with the updated time average value.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>TensorDict</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/m-dml_logo_banner_cropped.png" alt="Logo of MARINADE"/>
+            </a></p>
+<h1 class="logo"><a href="../index.html">MARINADE</a></h1>
+
+
+
+
+
+
+
+
+
+<search id="searchbox" style="display: none" role="search">
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Search"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script><h3>Navigation</h3>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../index.html">Documentation of MARINADE</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../backward.html">Tridiagonal Backward Pass</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../backward.html#tridiagonal-forward-pass">Tridiagonal Forward Pass</a></li>
+</ul>
+<ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="marinade.html">marinade</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="marinade.fabm.html">fabm</a></li>
+<li class="toctree-l2"><a class="reference internal" href="marinade.gotm.html">gotm</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="marinade.util.html">util</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="marinade.util.mask_functions.html">mask_functions</a></li>
+<li class="toctree-l3"><a class="reference internal" href="marinade.util.ode_solvers.html">ode_solvers</a></li>
+<li class="toctree-l3 current"><a class="reference internal" href="marinade.util.temporal_mean.html">temporal_mean</a><ul class="current">
+<li class="toctree-l4 current"><a class="current reference internal" href="#">TemporalMean</a><ul>
+<li class="toctree-l5"><a class="reference internal" href="#marinade.util.temporal_mean.TemporalMean"><code class="docutils literal notranslate"><span class="pre">TemporalMean</span></code></a><ul>
+<li class="toctree-l6"><a class="reference internal" href="#marinade.util.temporal_mean.TemporalMean.forward"><code class="docutils literal notranslate"><span class="pre">forward()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="marinade.html">marinade</a><ul>
+  <li><a href="marinade.util.html">util</a><ul>
+  <li><a href="marinade.util.temporal_mean.html">temporal_mean</a><ul>
+      <li>Previous: <a href="marinade.util.temporal_mean.html" title="previous chapter">temporal_mean</a></li>
+  </ul></li>
+  </ul></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &#169;2026, m-dml team.
+      
+      |
+      Powered by <a href="https://www.sphinx-doc.org/">Sphinx 9.2.0</a>
+      &amp; <a href="https://alabaster.readthedocs.io">Alabaster 1.0.0</a>
+      
+      |
+      <a href="../_sources/_autosummary/marinade.util.temporal_mean.TemporalMean.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

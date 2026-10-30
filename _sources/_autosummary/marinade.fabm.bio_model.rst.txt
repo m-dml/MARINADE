@@ -1,0 +1,41 @@
+bio\_model
+==========
+
+
+.. automodule:: marinade.fabm.bio_model
+
+    
+    
+    
+
+   
+   
+   
+
+   
+   
+   .. rubric:: Functions
+
+   .. autosummary::
+      :toctree:
+      :template: custom-base.rst
+   
+      shared_key_tensordicts
+   
+   
+
+   
+   
+   .. rubric:: Classes
+
+   .. autosummary::
+      :toctree:
+      :template: custom-class.rst
+   
+      BioModel
+   
+   
+
+   
+   
+   

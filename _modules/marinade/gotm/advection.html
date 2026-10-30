@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../../../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>marinade.gotm.advection &#8212; MARINADE 1.0.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=5ecbeea2" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/basic.css?v=b08954a9" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/alabaster.css?v=27fed22d" />
+    <script src="../../../_static/documentation_options.js?v=8d563738"></script>
+    <script src="../../../_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <link rel="icon" href="../../../_static/m-dml_logo_dark.png"/>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" />
+   
+  <link rel="stylesheet" href="../../../_static/custom.css" type="text/css" />
+  
+
+  
+  
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <h1>Source code for marinade.gotm.advection</h1><div class="highlight"><pre>
+<span></span><span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Union</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">tensordict</span><span class="w"> </span><span class="kn">import</span> <span class="n">TensorDict</span>
+
+
+<div class="viewcode-block" id="adv_reconstruct">
+<a class="viewcode-back" href="../../../_autosummary/marinade.gotm.advection.adv_reconstruct.html#marinade.gotm.advection.adv_reconstruct">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">adv_reconstruct</span><span class="p">(</span>
+    <span class="n">scheme</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">cfl</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">fuu</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">fu</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">fd</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">:</span>
+<span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Reconstruction of the advected quantity at the cell interface using different schemes.</span>
+
+<span class="sd">    This is a reimplementation of the Fortran subroutine ADV_RECONSTRUCT from GOTM.</span>
+
+<span class="sd">    Computes the upstream-biased fluxes:</span>
+
+<span class="sd">    .. math::</span>
+<span class="sd">        F_i^n = \frac{1}{\Delta t}\int_{z_i^{\text{Face}} - w \Delta t}^{z_i^{\text{Face}}} Y(z&#39;) \,\text{dz&#39;}</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        scheme (str): The name of the scheme (&quot;superbee&quot;, &quot;p2_pdm&quot;, &quot;splmax13&quot;, &quot;muscl&quot;, &quot;central&quot;, &quot;p2&quot;).</span>
+<span class="sd">        cfl (torch.Tensor): The Courant number. [batch, (tracer or 1), nlev]</span>
+<span class="sd">        fuu (torch.Tensor): The value at the upwind cell. [batch, tracer, nlev]</span>
+<span class="sd">        fu (torch.Tensor): The value at the current cell. [batch, tracer, nlev]</span>
+<span class="sd">        fd (torch.Tensor): The value at the downwind cell. [batch, tracer, nlev]</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        torch.Tensor: Computed fluxes.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">delta_f</span> <span class="o">=</span> <span class="n">fd</span> <span class="o">-</span> <span class="n">fu</span>
+    <span class="n">delta_fu</span> <span class="o">=</span> <span class="n">fu</span> <span class="o">-</span> <span class="n">fuu</span>
+
+    <span class="n">ratio</span> <span class="o">=</span> <span class="n">delta_fu</span> <span class="o">/</span> <span class="n">torch</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">delta_f</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">,</span> <span class="n">delta_f</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>  <span class="c1"># important for preventing nan values in the gradients!</span>
+
+    <span class="k">if</span> <span class="n">scheme</span> <span class="o">==</span> <span class="s2">&quot;superbee&quot;</span><span class="p">:</span>
+        <span class="n">limiter</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">maximum</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">clamp_max</span><span class="p">(</span><span class="mi">2</span> <span class="o">*</span> <span class="n">ratio</span><span class="p">,</span> <span class="mi">1</span><span class="p">),</span> <span class="n">torch</span><span class="o">.</span><span class="n">clamp_max</span><span class="p">(</span><span class="n">ratio</span><span class="p">,</span> <span class="mi">2</span><span class="p">))</span>  <span class="c1"># torch.clamp_max = minimum</span>
+        <span class="n">alt_output</span> <span class="o">=</span> <span class="n">fu</span>  <span class="c1"># output if delta_f * delta_fu &lt;= 0</span>
+    <span class="k">elif</span> <span class="n">scheme</span> <span class="o">==</span> <span class="s2">&quot;p2_pdm&quot;</span><span class="p">:</span>
+        <span class="n">x</span> <span class="o">=</span> <span class="mi">1</span> <span class="o">/</span> <span class="mi">6</span> <span class="o">*</span> <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">cfl</span><span class="p">)</span>
+        <span class="n">limiter</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">minimum</span><span class="p">((</span><span class="mf">0.5</span> <span class="o">+</span> <span class="n">x</span><span class="p">)</span> <span class="o">+</span> <span class="p">(</span><span class="mf">0.5</span> <span class="o">-</span> <span class="n">x</span><span class="p">)</span> <span class="o">*</span> <span class="n">ratio</span><span class="p">,</span> <span class="mi">2</span> <span class="o">/</span> <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="n">cfl</span><span class="p">))</span>
+        <span class="n">limiter</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">minimum</span><span class="p">(</span><span class="mi">2</span> <span class="o">*</span> <span class="n">ratio</span> <span class="o">/</span> <span class="p">(</span><span class="n">cfl</span> <span class="o">+</span> <span class="mf">1e-10</span><span class="p">),</span> <span class="n">limiter</span><span class="p">)</span>
+        <span class="n">alt_output</span> <span class="o">=</span> <span class="n">fu</span>  <span class="c1"># output if delta_f * delta_fu &lt;= 0</span>
+    <span class="k">elif</span> <span class="n">scheme</span> <span class="o">==</span> <span class="s2">&quot;splmax13&quot;</span><span class="p">:</span>
+        <span class="n">limiter</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">minimum</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">clamp_max</span><span class="p">(</span><span class="mi">2</span> <span class="o">*</span> <span class="n">ratio</span><span class="p">,</span> <span class="mi">2</span><span class="p">),</span> <span class="mi">1</span> <span class="o">/</span> <span class="mi">3</span> <span class="o">*</span> <span class="n">torch</span><span class="o">.</span><span class="n">clamp_min</span><span class="p">(</span><span class="mi">1</span> <span class="o">+</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">ratio</span><span class="p">,</span> <span class="mi">2</span> <span class="o">+</span> <span class="n">ratio</span><span class="p">))</span>
+        <span class="n">alt_output</span> <span class="o">=</span> <span class="n">fu</span>  <span class="c1"># output if delta_f * delta_fu &lt;= 0</span>
+    <span class="k">elif</span> <span class="n">scheme</span> <span class="o">==</span> <span class="s2">&quot;muscl&quot;</span><span class="p">:</span>
+        <span class="n">limiter</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">minimum</span><span class="p">(</span><span class="mi">2</span> <span class="o">*</span> <span class="n">ratio</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">clamp_max</span><span class="p">(</span><span class="mf">0.5</span> <span class="o">*</span> <span class="p">(</span><span class="mi">1</span> <span class="o">+</span> <span class="n">ratio</span><span class="p">),</span> <span class="mi">2</span><span class="p">))</span>
+        <span class="n">alt_output</span> <span class="o">=</span> <span class="n">fu</span>  <span class="c1"># output if delta_f * delta_fu &lt;= 0</span>
+    <span class="k">elif</span> <span class="n">scheme</span> <span class="o">==</span> <span class="s2">&quot;p2&quot;</span><span class="p">:</span>
+        <span class="n">x</span> <span class="o">=</span> <span class="mi">1</span> <span class="o">/</span> <span class="mi">6</span> <span class="o">*</span> <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">cfl</span><span class="p">)</span>
+        <span class="n">limiter</span> <span class="o">=</span> <span class="p">(</span><span class="mf">0.5</span> <span class="o">+</span> <span class="n">x</span><span class="p">)</span> <span class="o">+</span> <span class="p">(</span><span class="mf">0.5</span> <span class="o">-</span> <span class="n">x</span><span class="p">)</span> <span class="o">*</span> <span class="n">ratio</span>
+        <span class="n">alt_output</span> <span class="o">=</span> <span class="n">fu</span> <span class="o">+</span> <span class="mf">0.5</span> <span class="o">*</span> <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="n">cfl</span><span class="p">)</span> <span class="o">*</span> <span class="p">((</span><span class="mf">0.5</span> <span class="o">+</span> <span class="n">x</span><span class="p">)</span> <span class="o">*</span> <span class="n">delta_f</span> <span class="o">+</span> <span class="p">(</span><span class="mf">0.5</span> <span class="o">-</span> <span class="n">x</span><span class="p">)</span> <span class="o">*</span> <span class="n">delta_fu</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="n">scheme</span> <span class="o">==</span> <span class="s2">&quot;central&quot;</span><span class="p">:</span>
+        <span class="n">limiter</span> <span class="o">=</span> <span class="mi">1</span> <span class="o">/</span> <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="n">cfl</span><span class="p">)</span>
+        <span class="n">alt_output</span> <span class="o">=</span> <span class="mf">0.5</span> <span class="o">*</span> <span class="p">(</span><span class="n">fu</span> <span class="o">+</span> <span class="n">fd</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>  <span class="c1"># scheme == &quot;upstream&quot;</span>
+        <span class="n">limiter</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">zeros_like</span><span class="p">(</span><span class="n">cfl</span><span class="p">)</span>
+        <span class="n">alt_output</span> <span class="o">=</span> <span class="n">fu</span>  <span class="c1"># output if delta_f * delta_fu &lt;= 0</span>
+    <span class="k">return</span> <span class="n">torch</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">delta_f</span> <span class="o">*</span> <span class="n">delta_fu</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">,</span> <span class="n">fu</span> <span class="o">+</span> <span class="mf">0.5</span> <span class="o">*</span> <span class="n">limiter</span> <span class="o">*</span> <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="n">cfl</span><span class="p">)</span> <span class="o">*</span> <span class="n">delta_f</span><span class="p">,</span> <span class="n">alt_output</span><span class="p">)</span></div>
+
+
+
+<span class="c1"># @torch.jit.script</span>
+<div class="viewcode-block" id="advect_at_center">
+<a class="viewcode-back" href="../../../_autosummary/marinade.gotm.advection.advect_at_center.html#marinade.gotm.advection.advect_at_center">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">advect_at_center</span><span class="p">(</span>
+    <span class="n">value</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span>
+    <span class="n">dt</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span>
+    <span class="n">h</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span>
+    <span class="n">ww</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span>
+    <span class="n">bc_up_type</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="n">bc_down_type</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="n">bc_up_value</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="nb">int</span><span class="p">,</span> <span class="nb">float</span><span class="p">],</span>
+    <span class="n">bc_down_value</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="nb">int</span><span class="p">,</span> <span class="nb">float</span><span class="p">],</span>
+    <span class="n">scheme</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="n">conserve</span><span class="p">:</span> <span class="nb">bool</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">:</span>
+<span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Vertical advection of a quantity at the center of the grid cells. This is a reimplementation of the Fortran</span>
+<span class="sd">    subroutine ADVECT_AT_CENTER from GOTM.</span>
+
+<span class="sd">    If _conserve_ == _True_, the 1d conservative advection equation is used:</span>
+
+<span class="sd">    .. math::</span>
+<span class="sd">        \frac{\partial Y}{\partial t} = -\frac{\partial F}{\partial z}</span>
+
+<span class="sd">    If _conserve_ == _False_, the 1d non-conservative advection equation is used:</span>
+
+<span class="sd">    .. math::</span>
+<span class="sd">        \frac{\partial Y}{\partial t} = -(\frac{\partial F}{\partial z} - Y \frac{\partial w}{\partial z}),</span>
+
+<span class="sd">    where :math:`F` is the flux field due to the velocity :math:`w`.</span>
+
+
+<span class="sd">    Args:</span>
+<span class="sd">        value (torch.Tensor): Values of the advected quantity at cell centers. [n_batch, tracer, nlev]</span>
+<span class="sd">        dt (torch.Tensor): Time step.</span>
+<span class="sd">        h (torch.Tensor): Cell thicknesses. [n_batch, 1, nlev]</span>
+<span class="sd">        ww (torch.Tensor): Vertical velocities at cell interfaces. [n_batch, (tracer or 1), nlev+1]</span>
+<span class="sd">        bc_up_type (str): Type of upper boundary condition (&quot;flux&quot;, &quot;value&quot;, &quot;oneSided&quot;, &quot;zeroDivergence&quot;).</span>
+<span class="sd">        bc_down_type (str): Type of lower boundary condition (&quot;flux&quot;, &quot;value&quot;, &quot;oneSided&quot;, &quot;zeroDivergence&quot;).</span>
+<span class="sd">        bc_up_value (Union[torch.Tensor, int, float]): Value for upper boundary condition. Scalar or [batch, tracer]</span>
+<span class="sd">        bc_down_value (Union[torch.Tensor, int, float]): Value for lower boundary condition. Scalar or [batch, tracer]</span>
+<span class="sd">        scheme (str): Advection scheme to use (&quot;superbee&quot;, &quot;p2_pdm&quot;, &quot;splmax13&quot;, &quot;muscl&quot;, &quot;central&quot;, &quot;p2&quot;).</span>
+<span class="sd">        conserve (bool): Whether to use the conservative form of the advection equation.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        torch.Tensor: Advected tracers.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">device</span> <span class="o">=</span> <span class="n">value</span><span class="o">.</span><span class="n">device</span>
+    <span class="n">dtype</span> <span class="o">=</span> <span class="n">value</span><span class="o">.</span><span class="n">dtype</span>
+    <span class="n">nlev</span> <span class="o">=</span> <span class="n">value</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">bc_up_value</span><span class="p">,</span> <span class="nb">int</span><span class="p">):</span>
+        <span class="n">bc_up_value</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="n">bc_up_value</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">value</span><span class="o">.</span><span class="n">device</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">value</span><span class="o">.</span><span class="n">dtype</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">bc_up_value</span><span class="p">,</span> <span class="nb">float</span><span class="p">):</span>
+        <span class="n">bc_up_value</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="n">bc_up_value</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">value</span><span class="o">.</span><span class="n">device</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">value</span><span class="o">.</span><span class="n">dtype</span><span class="p">)</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">bc_down_value</span><span class="p">,</span> <span class="nb">int</span><span class="p">):</span>
+        <span class="n">bc_down_value</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="n">bc_down_value</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">value</span><span class="o">.</span><span class="n">device</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">value</span><span class="o">.</span><span class="n">dtype</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">bc_down_value</span><span class="p">,</span> <span class="nb">float</span><span class="p">):</span>
+        <span class="n">bc_down_value</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="n">bc_down_value</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">value</span><span class="o">.</span><span class="n">device</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">value</span><span class="o">.</span><span class="n">dtype</span><span class="p">)</span>
+
+    <span class="n">itmax</span> <span class="o">=</span> <span class="mi">100</span>
+
+    <span class="n">cmax</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">max</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">ww</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="mi">1</span><span class="p">:</span><span class="n">nlev</span><span class="p">])</span> <span class="o">*</span> <span class="p">(</span><span class="mi">2</span> <span class="o">*</span> <span class="n">dt</span><span class="p">)</span> <span class="o">/</span> <span class="p">(</span><span class="n">h</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="p">:</span> <span class="n">nlev</span> <span class="o">-</span> <span class="mi">1</span><span class="p">]</span> <span class="o">+</span> <span class="n">h</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="mi">1</span><span class="p">:]),</span> <span class="n">dim</span><span class="o">=-</span><span class="mi">1</span><span class="p">,</span> <span class="n">keepdim</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">it</span> <span class="o">=</span> <span class="p">(</span><span class="n">cmax</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span><span class="o">.</span><span class="n">clamp_max</span><span class="p">(</span><span class="n">itmax</span><span class="p">)</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">int</span><span class="p">)</span>
+
+    <span class="n">c</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">ww</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="mi">1</span><span class="p">:</span><span class="n">nlev</span><span class="p">])</span> <span class="o">*</span> <span class="p">(</span><span class="mi">2</span> <span class="o">*</span> <span class="n">dt</span> <span class="o">/</span> <span class="n">it</span><span class="p">)</span> <span class="o">/</span> <span class="p">(</span><span class="n">h</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="p">:</span> <span class="n">nlev</span> <span class="o">-</span> <span class="mi">1</span><span class="p">]</span> <span class="o">+</span> <span class="n">h</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="mi">1</span><span class="p">:])</span>
+    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="nb">int</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">max</span><span class="p">(</span><span class="n">it</span><span class="p">)</span><span class="o">.</span><span class="n">item</span><span class="p">())</span> <span class="o">+</span> <span class="mi">1</span><span class="p">):</span>  <span class="c1"># time iteration</span>
+        <span class="n">Yu</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">empty_like</span><span class="p">(</span><span class="n">value</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="mi">1</span><span class="p">:])</span>
+        <span class="n">Yu</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="mi">1</span><span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">ww</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="mi">2</span> <span class="p">:</span> <span class="n">nlev</span> <span class="o">-</span> <span class="mi">1</span><span class="p">]</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">,</span> <span class="n">value</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="p">:</span><span class="o">-</span><span class="mi">3</span><span class="p">],</span> <span class="n">value</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="mi">3</span><span class="p">:])</span>
+        <span class="n">Yu</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">ww</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="mi">1</span><span class="p">]</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">,</span> <span class="n">value</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="mi">0</span><span class="p">],</span> <span class="n">value</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="mi">2</span><span class="p">])</span>
+        <span class="n">Yu</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">ww</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="n">nlev</span> <span class="o">-</span> <span class="mi">1</span><span class="p">]</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">,</span> <span class="n">value</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="o">-</span><span class="mi">3</span><span class="p">],</span> <span class="n">value</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">])</span>
+        <span class="n">Yc</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">ww</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="mi">1</span><span class="p">:</span><span class="n">nlev</span><span class="p">]</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">,</span> <span class="n">value</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="p">:</span> <span class="n">nlev</span> <span class="o">-</span> <span class="mi">1</span><span class="p">],</span> <span class="n">value</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="mi">1</span><span class="p">:])</span>
+        <span class="n">Yd</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">ww</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="mi">1</span><span class="p">:</span><span class="n">nlev</span><span class="p">]</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">,</span> <span class="n">value</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="mi">1</span><span class="p">:],</span> <span class="n">value</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="p">:</span> <span class="n">nlev</span> <span class="o">-</span> <span class="mi">1</span><span class="p">])</span>
+
+        <span class="n">cu</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">empty</span><span class="p">([</span><span class="n">value</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="o">-</span><span class="mi">3</span><span class="p">],</span> <span class="n">value</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="o">-</span><span class="mi">2</span><span class="p">],</span> <span class="n">value</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">+</span> <span class="mi">1</span><span class="p">],</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">)</span>
+        <span class="n">cu</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="mi">1</span><span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="n">ww</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="mi">1</span><span class="p">:</span><span class="n">nlev</span><span class="p">]</span> <span class="o">*</span> <span class="n">adv_reconstruct</span><span class="p">(</span><span class="n">scheme</span><span class="p">,</span> <span class="n">c</span><span class="p">,</span> <span class="n">Yu</span><span class="p">,</span> <span class="n">Yc</span><span class="p">,</span> <span class="n">Yd</span><span class="p">)</span>
+
+        <span class="c1"># Upper boundary conditions</span>
+        <span class="k">if</span> <span class="n">bc_up_type</span> <span class="o">==</span> <span class="s2">&quot;flux&quot;</span><span class="p">:</span>
+            <span class="n">cu</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="n">nlev</span><span class="p">]</span> <span class="o">=</span> <span class="o">-</span><span class="n">bc_up_value</span>
+        <span class="k">elif</span> <span class="n">bc_up_type</span> <span class="o">==</span> <span class="s2">&quot;value&quot;</span><span class="p">:</span>
+            <span class="n">cu</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="n">nlev</span><span class="p">]</span> <span class="o">=</span> <span class="n">ww</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="n">nlev</span><span class="p">]</span> <span class="o">*</span> <span class="n">bc_up_value</span>
+        <span class="k">elif</span> <span class="n">bc_up_type</span> <span class="o">==</span> <span class="s2">&quot;oneSided&quot;</span><span class="p">:</span>
+            <span class="n">cu</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="n">nlev</span><span class="p">]</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">ww</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="n">nlev</span><span class="p">]</span> <span class="o">&gt;=</span> <span class="mi">0</span><span class="p">,</span> <span class="n">ww</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="n">nlev</span><span class="p">]</span> <span class="o">*</span> <span class="n">value</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="n">nlev</span> <span class="o">-</span> <span class="mi">1</span><span class="p">],</span> <span class="mf">0.0</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="n">bc_up_type</span> <span class="o">==</span> <span class="s2">&quot;zeroDivergence&quot;</span><span class="p">:</span>
+            <span class="n">cu</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="n">nlev</span><span class="p">]</span> <span class="o">=</span> <span class="n">cu</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="n">nlev</span> <span class="o">-</span> <span class="mi">1</span><span class="p">]</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Unknown upper boundary condition type in adv_center()&quot;</span><span class="p">)</span>
+
+        <span class="c1"># Lower boundary conditions</span>
+        <span class="k">if</span> <span class="n">bc_down_type</span> <span class="o">==</span> <span class="s2">&quot;flux&quot;</span><span class="p">:</span>
+            <span class="n">cu</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="n">bc_down_value</span>
+        <span class="k">elif</span> <span class="n">bc_down_type</span> <span class="o">==</span> <span class="s2">&quot;value&quot;</span><span class="p">:</span>
+            <span class="n">cu</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="n">ww</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span> <span class="o">*</span> <span class="n">bc_down_value</span>
+        <span class="k">elif</span> <span class="n">bc_down_type</span> <span class="o">==</span> <span class="s2">&quot;oneSided&quot;</span><span class="p">:</span>
+            <span class="n">cu</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">ww</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="n">ww</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span> <span class="o">*</span> <span class="n">value</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="mi">0</span><span class="p">])</span>
+        <span class="k">elif</span> <span class="n">bc_down_type</span> <span class="o">==</span> <span class="s2">&quot;zeroDivergence&quot;</span><span class="p">:</span>
+            <span class="n">cu</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="n">cu</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="mi">1</span><span class="p">]</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Unknown lower boundary condition type in adv_center()&quot;</span><span class="p">)</span>
+
+        <span class="c1"># Vertical advection step</span>
+        <span class="k">if</span> <span class="n">conserve</span><span class="p">:</span>
+            <span class="c1"># Only update the value for each batch element as often as necessary.</span>
+            <span class="c1"># The number of substeps per batch element should not depend on the</span>
+            <span class="c1"># (potentially random) combination of batch elements.</span>
+            <span class="n">value</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">i</span> <span class="o">&lt;=</span> <span class="n">it</span><span class="p">,</span> <span class="n">value</span> <span class="o">-</span> <span class="n">dt</span> <span class="o">/</span> <span class="n">it</span> <span class="o">*</span> <span class="p">((</span><span class="n">cu</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="mi">1</span><span class="p">:]</span> <span class="o">-</span> <span class="n">cu</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="p">:</span><span class="n">nlev</span><span class="p">])</span> <span class="o">/</span> <span class="n">h</span><span class="p">),</span> <span class="n">value</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">value</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">where</span><span class="p">(</span>
+                <span class="n">i</span> <span class="o">&lt;=</span> <span class="n">it</span><span class="p">,</span>
+                <span class="n">value</span> <span class="o">-</span> <span class="n">dt</span> <span class="o">/</span> <span class="n">it</span> <span class="o">*</span> <span class="p">((</span><span class="n">cu</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="mi">1</span><span class="p">:]</span> <span class="o">-</span> <span class="n">cu</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="p">:</span><span class="n">nlev</span><span class="p">])</span> <span class="o">-</span> <span class="n">value</span> <span class="o">*</span> <span class="p">(</span><span class="n">ww</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="mi">1</span><span class="p">:]</span> <span class="o">-</span> <span class="n">ww</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="p">:</span><span class="n">nlev</span><span class="p">]))</span> <span class="o">/</span> <span class="n">h</span><span class="p">,</span>
+                <span class="n">value</span><span class="p">,</span>
+            <span class="p">)</span>
+    <span class="k">return</span> <span class="n">value</span></div>
+
+
+
+<div class="viewcode-block" id="AdvectionOperator">
+<a class="viewcode-back" href="../../../_autosummary/marinade.gotm.advection.AdvectionOperator.html#marinade.gotm.advection.AdvectionOperator">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">AdvectionOperator</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Advection operator class.</span>
+
+<span class="sd">    Should be initialized with the important numerical parameters and schemes for the simulation. Has a *forward* method</span>
+<span class="sd">    for computing a single time step. Calling the operator object itself also calls its *forward* method.</span>
+
+<span class="sd">    The operator solves the conservative or non-conservative advection equation:</span>
+
+<span class="sd">    .. math::</span>
+<span class="sd">        \\frac{\partial Y}{\partial t} &amp;= -\\frac{\partial F}{\partial z}</span>
+<span class="sd">        \qquad &amp;&amp; \\text{(Conservative form)} \\\\</span>
+<span class="sd">        \\frac{\partial Y}{\partial t}</span>
+<span class="sd">        &amp;= -\left(\\frac{\partial F}{\partial z} - Y \\frac{\partial w}{\partial z}\\right)</span>
+<span class="sd">        \qquad &amp;&amp; \\text{(Non-conservative form)}</span>
+
+<span class="sd">    :math:`F` is the flux field due to the velocity :math:`w`. It is computed in an upstream-biased way:</span>
+
+<span class="sd">    .. math::</span>
+<span class="sd">        F_i^n = \\frac{1}{\\Delta t}\\int_{z_i^{\\text{Face}} - w \\Delta t}^{z_i^{\\text{Face}}} Y(z&#39;) \\,\\text{dz&#39;}</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        bc_up_type (str): Type of upper boundary condition (&quot;flux&quot;, &quot;value&quot;, &quot;oneSided&quot;, &quot;zeroDivergence&quot;).</span>
+<span class="sd">        bc_down_type (str): Type of lower boundary condition (&quot;flux&quot;, &quot;value&quot;, &quot;oneSided&quot;, &quot;zeroDivergence&quot;).</span>
+<span class="sd">        bc_up_value (Union[torch.Tensor, float, int]): Value for upper boundary condition. Scalar or [batch, tracer]</span>
+<span class="sd">        bc_down_value (Union[torch.Tensor, float, int]): Value for lower boundary condition. Scalar or [batch, tracer]</span>
+<span class="sd">        scheme (str): Advection limiter scheme to use (&quot;superbee&quot;, &quot;p2_pdm&quot;, &quot;splmax13&quot;, &quot;muscl&quot;, &quot;central&quot;, &quot;p2&quot;).</span>
+<span class="sd">        conserve (bool): Whether to use the conservative form of the advection equation.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">bc_up_type</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">bc_down_type</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">bc_up_value</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="nb">float</span><span class="p">,</span> <span class="nb">int</span><span class="p">],</span>
+        <span class="n">bc_down_value</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="nb">float</span><span class="p">,</span> <span class="nb">int</span><span class="p">],</span>
+        <span class="n">scheme</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">conserve</span><span class="p">:</span> <span class="nb">bool</span><span class="p">,</span>
+        <span class="o">*</span><span class="n">args</span><span class="p">,</span>
+        <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
+    <span class="p">):</span>
+        <span class="k">if</span> <span class="n">bc_up_type</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">&quot;flux&quot;</span><span class="p">,</span> <span class="s2">&quot;value&quot;</span><span class="p">,</span> <span class="s2">&quot;oneSided&quot;</span><span class="p">,</span> <span class="s2">&quot;zeroDivergence&quot;</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">bc_up_type</span> <span class="o">=</span> <span class="n">bc_up_type</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Unknown upper boundary condition type&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">bc_down_type</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">&quot;flux&quot;</span><span class="p">,</span> <span class="s2">&quot;value&quot;</span><span class="p">,</span> <span class="s2">&quot;oneSided&quot;</span><span class="p">,</span> <span class="s2">&quot;zeroDivergence&quot;</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">bc_down_type</span> <span class="o">=</span> <span class="n">bc_down_type</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Unknown lower boundary condition type&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">bc_up_value</span> <span class="o">=</span> <span class="n">bc_up_value</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">bc_down_value</span> <span class="o">=</span> <span class="n">bc_down_value</span>
+        <span class="k">if</span> <span class="n">scheme</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">&quot;superbee&quot;</span><span class="p">,</span> <span class="s2">&quot;p2_pdm&quot;</span><span class="p">,</span> <span class="s2">&quot;splmax13&quot;</span><span class="p">,</span> <span class="s2">&quot;muscl&quot;</span><span class="p">,</span> <span class="s2">&quot;central&quot;</span><span class="p">,</span> <span class="s2">&quot;p2&quot;</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">scheme</span> <span class="o">=</span> <span class="n">scheme</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Unknown vertical advection scheme&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">conserve</span> <span class="o">=</span> <span class="n">conserve</span>
+
+<div class="viewcode-block" id="AdvectionOperator.forward">
+<a class="viewcode-back" href="../../../_autosummary/marinade.gotm.advection.AdvectionOperator.html#marinade.gotm.advection.AdvectionOperator.forward">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">forward</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">concentration</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">TensorDict</span><span class="p">],</span>
+        <span class="n">dt</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span>
+        <span class="n">h</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span>
+        <span class="n">w</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Compute the state at the next time step from the current state after advection.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            concentration (Union[torch.Tensor, TensorDict]): The initial tracer concentration field.</span>
+<span class="sd">                Can be a TensorDict. Then this operator acts on *concentration[&quot;pelagic&quot;]*.</span>
+<span class="sd">                This functionality exists because benthic (sediment) variables might be part</span>
+<span class="sd">                of the tracer state, but they are only on the ground and do not advect.</span>
+<span class="sd">                [batch, tracer, nlev]</span>
+<span class="sd">            dt (float): The time step.</span>
+<span class="sd">            h (torch.Tensor): The layer heights. [batch, 1, nlev]</span>
+<span class="sd">            w (torch.Tensor): The velocity field. This can be:</span>
+
+<span class="sd">                - [batch, (tracer or 1), nlev]:   Values at cell centers</span>
+<span class="sd">                - [batch, (tracer or 1), nlev+1]: Values at cell faces.</span>
+<span class="sd">                - [batch, (tracer or 1), 1]: Constant velocity field (also at domain boundaries).</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            torch.Tensor: The state at the next time step. [batch, tracer, nlev]</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">concentration</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">):</span>
+            <span class="n">x</span> <span class="o">=</span> <span class="n">concentration</span>
+        <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">concentration</span><span class="p">,</span> <span class="n">TensorDict</span><span class="p">):</span>
+            <span class="n">x</span> <span class="o">=</span> <span class="n">concentration</span><span class="p">[</span><span class="s2">&quot;pelagic&quot;</span><span class="p">]</span>
+
+        <span class="c1"># w should be given at the cell faces</span>
+        <span class="k">if</span> <span class="n">w</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">==</span> <span class="n">x</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]:</span>
+            <span class="c1"># w is given at the cell centers</span>
+            <span class="c1"># Interpolate it at the faces</span>
+            <span class="n">iweights</span> <span class="o">=</span> <span class="n">h</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="mi">1</span><span class="p">:]</span> <span class="o">/</span> <span class="p">(</span><span class="n">h</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">+</span> <span class="n">h</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="mi">1</span><span class="p">:])</span>
+            <span class="n">_shape</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">w</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span>
+            <span class="n">_shape</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="n">x</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">+</span> <span class="mi">1</span>
+            <span class="n">ws1d</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">empty</span><span class="p">(</span><span class="n">_shape</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">w</span><span class="o">.</span><span class="n">device</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">w</span><span class="o">.</span><span class="n">dtype</span><span class="p">)</span>
+            <span class="n">ws1d</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="mi">1</span><span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="n">iweights</span> <span class="o">*</span> <span class="n">w</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">+</span> <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="n">iweights</span><span class="p">)</span> <span class="o">*</span> <span class="n">w</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="mi">1</span><span class="p">:]</span>
+            <span class="n">ws1d</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">)]</span> <span class="o">=</span> <span class="n">w</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">)]</span>
+            <span class="n">w</span> <span class="o">=</span> <span class="n">ws1d</span>
+        <span class="k">elif</span> <span class="n">w</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="c1"># w is given as a constant</span>
+            <span class="n">_shape</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">w</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span>
+            <span class="n">_shape</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="n">x</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">+</span> <span class="mi">1</span>
+            <span class="n">ws1d</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">empty</span><span class="p">(</span><span class="n">_shape</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">w</span><span class="o">.</span><span class="n">device</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">w</span><span class="o">.</span><span class="n">dtype</span><span class="p">)</span>
+            <span class="n">ws1d</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="p">:]</span> <span class="o">=</span> <span class="n">w</span>
+            <span class="n">w</span> <span class="o">=</span> <span class="n">ws1d</span>
+        <span class="k">elif</span> <span class="n">w</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">!=</span> <span class="n">x</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">+</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="s2">&quot;w does not have the expected shape! It should be of shape &quot;</span>
+                <span class="s2">&quot;[batch, (tracer or 1), (nlev+1 or nlev or 1)].&quot;</span>
+            <span class="p">)</span>
+
+        <span class="n">x_new</span> <span class="o">=</span> <span class="n">advect_at_center</span><span class="p">(</span>
+            <span class="n">x</span><span class="p">,</span>
+            <span class="n">dt</span><span class="p">,</span>
+            <span class="n">h</span><span class="p">,</span>
+            <span class="n">w</span><span class="p">,</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">bc_up_type</span><span class="p">,</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">bc_down_type</span><span class="p">,</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">bc_up_value</span><span class="p">,</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">bc_down_value</span><span class="p">,</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">scheme</span><span class="p">,</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">conserve</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">concentration</span><span class="p">,</span> <span class="n">TensorDict</span><span class="p">):</span>
+            <span class="n">concentration</span> <span class="o">=</span> <span class="n">concentration</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+            <span class="n">concentration</span><span class="p">[</span><span class="s2">&quot;pelagic&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">x_new</span>
+            <span class="k">return</span> <span class="n">concentration</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">x_new</span></div>
+
+
+    <span class="fm">__call__</span> <span class="o">=</span> <span class="n">forward</span>  <span class="c1"># define alias for simplified calling</span></div>
+
+</pre></div>
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../../../index.html">
+              <img class="logo" src="../../../_static/m-dml_logo_banner_cropped.png" alt="Logo of MARINADE"/>
+            </a></p>
+<h1 class="logo"><a href="../../../index.html">MARINADE</a></h1>
+
+
+
+
+
+
+
+
+
+<search id="searchbox" style="display: none" role="search">
+    <div class="searchformwrapper">
+    <form class="search" action="../../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Search"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script><h3>Navigation</h3>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../index.html">Documentation of MARINADE</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../backward.html">Tridiagonal Backward Pass</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../backward.html#tridiagonal-forward-pass">Tridiagonal Forward Pass</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../_autosummary/marinade.html">marinade</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../../../index.html">Documentation overview</a><ul>
+  <li><a href="../../index.html">Module code</a><ul>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &#169;2026, m-dml team.
+      
+      |
+      Powered by <a href="https://www.sphinx-doc.org/">Sphinx 9.2.0</a>
+      &amp; <a href="https://alabaster.readthedocs.io">Alabaster 1.0.0</a>
+      
+    </div>
+
+    
+
+    
+  </body>
+</html>

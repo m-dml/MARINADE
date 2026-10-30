@@ -1,0 +1,28 @@
+NPZDModel
+=========
+
+.. currentmodule:: marinade.fabm.base_model
+
+.. autoclass:: NPZDModel
+   :members:
+
+   
+
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+   
+      ~NPZDModel.__init__
+      ~NPZDModel.create_model_from_yaml_file
+      ~NPZDModel.do_repair_state
+      ~NPZDModel.forward
+      ~NPZDModel.get_parameters
+      ~NPZDModel.get_vertical_movement
+      ~NPZDModel.update_parameters
+   
+   
+
+   
+   
+   

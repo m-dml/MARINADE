@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../../../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>marinade.gotm.diffusion &#8212; MARINADE 1.0.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=5ecbeea2" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/basic.css?v=b08954a9" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/alabaster.css?v=27fed22d" />
+    <script src="../../../_static/documentation_options.js?v=8d563738"></script>
+    <script src="../../../_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <link rel="icon" href="../../../_static/m-dml_logo_dark.png"/>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" />
+   
+  <link rel="stylesheet" href="../../../_static/custom.css" type="text/css" />
+  
+
+  
+  
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <h1>Source code for marinade.gotm.diffusion</h1><div class="highlight"><pre>
+<span></span><span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Union</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">marinade.gotm.tridiagonal</span><span class="w"> </span><span class="kn">import</span> <span class="n">tridiagonal_solve</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">tensordict</span><span class="w"> </span><span class="kn">import</span> <span class="n">TensorDict</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">torch</span><span class="w"> </span><span class="kn">import</span> <span class="n">tensor</span>
+
+
+<div class="viewcode-block" id="diffuse_at_center">
+<a class="viewcode-back" href="../../../_autosummary/marinade.gotm.diffusion.diffuse_at_center.html#marinade.gotm.diffusion.diffuse_at_center">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">diffuse_at_center</span><span class="p">(</span>
+    <span class="n">value</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span>
+    <span class="n">dt</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span>
+    <span class="n">h</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span>
+    <span class="n">nu</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span>
+    <span class="n">bc_up_type</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="n">bc_down_type</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="n">bc_up_value</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">],</span>
+    <span class="n">bc_down_value</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">],</span>
+    <span class="n">implicitness</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1.0</span><span class="p">,</span>
+    <span class="n">allow_negative</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="n">lsource</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">qsource</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">method</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;thomas&quot;</span><span class="p">,</span>
+    <span class="n">implicit_backward</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">:</span>
+<span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Diffuse a tracer at layer centers using GOTM diffusion operator.</span>
+
+<span class="sd">    Solves the one-dimensional diffusion equation:</span>
+
+<span class="sd">    .. math::</span>
+<span class="sd">        \frac{\partial Y}{\partial t} = \frac{\partial}{\partial z}\left(\nu_Y\frac{\partial Y}{\partial z}\right)</span>
+<span class="sd">        + Y L_{sour} + Q_{sour}</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        value (torch.Tensor): Initial tracer concentration. [batch, tracer, nlev]</span>
+<span class="sd">        dt (float): Time step.</span>
+<span class="sd">        h (torch.Tensor): Layer heights. [batch, 1, nlev]</span>
+<span class="sd">        nu (torch.Tensor): Turbulent diffusivities. [batch, 1, nlev+1]</span>
+<span class="sd">        bc_up_type (str): Type of the upper boundary condition. &quot;neumann&quot; or &quot;dirichlet&quot;.</span>
+<span class="sd">        bc_down_type (str): Type of the lower boundary condition. &quot;neumann&quot; or &quot;dirichlet&quot;.</span>
+<span class="sd">        bc_up_value (Union[float, torch.Tensor]): Value of the upper boundary condition.</span>
+<span class="sd">            Scalar or [batch, (tracer or 1)]</span>
+<span class="sd">        bc_down_value (Union[float, torch.Tensor]): Value of the lower boundary condition.</span>
+<span class="sd">            Scalar or [batch, (tracer or 1)]</span>
+<span class="sd">        implicitness (float, optional): The implicitness of the numerical scheme. Defaults to 1.0.</span>
+<span class="sd">        allow_negative (bool, optional): Whether to allow negative values of the tracer. Defaults to False.</span>
+<span class="sd">        lsource (torch.Tensor, optional): Linear source term. Defaults to None. [batch, (tracer or 1), nlev]</span>
+<span class="sd">        qsource (torch.Tensor, optional): Constant source term. Defaults to None. [batch, (tracer or 1), nlev]</span>
+<span class="sd">        method (str, optional): Method for tridiagonal solver. One of (&quot;thomas&quot;, &quot;paracr&quot;, &quot;linalg&quot;).</span>
+<span class="sd">            Defaults to &quot;thomas&quot;.</span>
+<span class="sd">        implicit_backward (bool, optional): If True, uses custom backward method based on implicit differentiation.</span>
+<span class="sd">            Defaults to True.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        torch.Tensor: Final tracer concentration, shape (batch, nlev)</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">bc_up_value</span><span class="p">,</span> <span class="nb">float</span><span class="p">):</span>
+        <span class="n">bc_up_value</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="n">bc_up_value</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">value</span><span class="o">.</span><span class="n">dtype</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">value</span><span class="o">.</span><span class="n">device</span><span class="p">)</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">bc_down_value</span><span class="p">,</span> <span class="nb">float</span><span class="p">):</span>
+        <span class="n">bc_down_value</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="n">bc_down_value</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">value</span><span class="o">.</span><span class="n">dtype</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">value</span><span class="o">.</span><span class="n">device</span><span class="p">)</span>
+
+    <span class="n">au</span><span class="p">,</span> <span class="n">bu</span><span class="p">,</span> <span class="n">cu</span><span class="p">,</span> <span class="n">yu</span> <span class="o">=</span> <span class="n">setup_tridiagonal_matrix</span><span class="p">(</span>
+        <span class="n">value</span><span class="p">,</span>
+        <span class="n">dt</span><span class="p">,</span>
+        <span class="n">h</span><span class="p">,</span>
+        <span class="n">nu</span><span class="p">,</span>
+        <span class="n">bc_up_type</span><span class="p">,</span>
+        <span class="n">bc_down_type</span><span class="p">,</span>
+        <span class="n">bc_up_value</span><span class="p">,</span>
+        <span class="n">bc_down_value</span><span class="p">,</span>
+        <span class="n">implicitness</span><span class="o">=</span><span class="n">implicitness</span><span class="p">,</span>
+        <span class="n">allow_negative</span><span class="o">=</span><span class="n">allow_negative</span><span class="p">,</span>
+        <span class="n">lsource</span><span class="o">=</span><span class="n">lsource</span><span class="p">,</span>
+        <span class="n">qsource</span><span class="o">=</span><span class="n">qsource</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">solution</span> <span class="o">=</span> <span class="n">tridiagonal_solve</span><span class="p">(</span><span class="n">au</span><span class="p">,</span> <span class="n">bu</span><span class="p">,</span> <span class="n">cu</span><span class="p">,</span> <span class="n">yu</span><span class="p">,</span> <span class="n">method</span><span class="p">,</span> <span class="n">implicit_backward</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">solution</span></div>
+
+
+
+<span class="c1"># @torch.jit.script</span>
+<div class="viewcode-block" id="setup_boundary">
+<a class="viewcode-back" href="../../../_autosummary/marinade.gotm.diffusion.setup_boundary.html#marinade.gotm.diffusion.setup_boundary">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">setup_boundary</span><span class="p">(</span>
+    <span class="n">dt</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span>
+    <span class="n">implicitness</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span>
+    <span class="n">allow_negative</span><span class="p">:</span> <span class="nb">bool</span><span class="p">,</span>
+    <span class="n">h_boundary</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span>
+    <span class="n">h_adjacent</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span>
+    <span class="n">nu_boundary</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span>
+    <span class="n">value_boundary</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span>
+    <span class="n">value_adjacent</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span>
+    <span class="n">ls</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span>
+    <span class="n">qs</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span>
+    <span class="n">bc_type</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="n">bc_value</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span>
+    <span class="n">dtype</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">dtype</span><span class="p">,</span>
+    <span class="n">device</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">device</span><span class="p">,</span>
+<span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Sets up a row of a tridiagonal system for a boundary condition.&quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">bc_type</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">&quot;flux&quot;</span><span class="p">,</span> <span class="s2">&quot;neumann&quot;</span><span class="p">):</span>
+        <span class="n">v</span> <span class="o">=</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">dt</span> <span class="o">*</span> <span class="n">nu_boundary</span> <span class="o">/</span> <span class="p">(</span><span class="n">h_boundary</span> <span class="o">+</span> <span class="n">h_adjacent</span><span class="p">)</span> <span class="o">/</span> <span class="n">h_boundary</span>
+        <span class="n">offdiag</span> <span class="o">=</span> <span class="o">-</span><span class="n">implicitness</span> <span class="o">*</span> <span class="n">v</span>  <span class="c1"># a or c</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">allow_negative</span> <span class="ow">and</span> <span class="p">(</span><span class="n">bc_value</span> <span class="o">&lt;</span> <span class="mf">0.0</span><span class="p">)</span><span class="o">.</span><span class="n">any</span><span class="p">():</span>  <span class="c1"># Patankar (1980) trick</span>
+            <span class="n">_one_minus</span> <span class="o">=</span> <span class="mi">1</span> <span class="o">-</span> <span class="n">offdiag</span>
+            <span class="n">_div</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">bc_value</span> <span class="o">&lt;</span> <span class="mf">0.0</span><span class="p">,</span> <span class="n">value_boundary</span> <span class="o">*</span> <span class="n">h_boundary</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">)</span>
+            <span class="c1"># prevent NaN gradients: don&#39;t divide by zero</span>
+            <span class="n">_where_zero</span> <span class="o">=</span> <span class="n">_div</span> <span class="o">==</span> <span class="mf">0.0</span>
+            <span class="n">_div</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">_where_zero</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">,</span> <span class="n">_div</span><span class="p">)</span>
+            <span class="n">_val</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">bc_value</span> <span class="o">&lt;</span> <span class="mf">0.0</span><span class="p">,</span> <span class="n">_one_minus</span> <span class="o">-</span> <span class="n">dt</span> <span class="o">*</span> <span class="n">bc_value</span> <span class="o">/</span> <span class="n">_div</span><span class="p">,</span> <span class="n">_one_minus</span><span class="p">)</span>
+            <span class="n">_val</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">_where_zero</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">inf</span><span class="p">,</span> <span class="n">_val</span><span class="p">)</span>
+            <span class="c1"># torch.inf is ok because later on, only 1/_val is used. This will give zero.</span>
+            <span class="n">_val1</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">bc_value</span> <span class="o">&lt;</span> <span class="mf">0.0</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">),</span> <span class="n">bc_value</span> <span class="o">/</span> <span class="n">h_boundary</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">_val</span> <span class="o">=</span> <span class="mi">1</span> <span class="o">-</span> <span class="n">offdiag</span>
+            <span class="n">_val1</span> <span class="o">=</span> <span class="n">bc_value</span> <span class="o">/</span> <span class="n">h_boundary</span>
+        <span class="n">b</span> <span class="o">=</span> <span class="n">_val</span> <span class="o">-</span> <span class="n">ls</span>
+        <span class="n">y</span> <span class="o">=</span> <span class="n">value_boundary</span> <span class="o">+</span> <span class="n">dt</span> <span class="o">*</span> <span class="n">_val1</span> <span class="o">+</span> <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="n">implicitness</span><span class="p">)</span> <span class="o">*</span> <span class="n">v</span> <span class="o">*</span> <span class="p">(</span><span class="n">value_adjacent</span> <span class="o">-</span> <span class="n">value_boundary</span><span class="p">)</span> <span class="o">+</span> <span class="n">qs</span>
+    <span class="k">elif</span> <span class="n">bc_type</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">&quot;value&quot;</span><span class="p">,</span> <span class="s2">&quot;dirichlet&quot;</span><span class="p">):</span>
+        <span class="n">b</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">ones_like</span><span class="p">(</span><span class="n">h_boundary</span><span class="p">)</span>
+        <span class="n">offdiag</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">zeros_like</span><span class="p">(</span><span class="n">h_boundary</span><span class="p">)</span>
+        <span class="n">y</span> <span class="o">=</span> <span class="n">bc_value</span><span class="o">.</span><span class="n">expand_as</span><span class="p">(</span><span class="n">value_boundary</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Invalid boundary condition type: </span><span class="si">{</span><span class="n">bc_type</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">b</span><span class="p">,</span> <span class="n">offdiag</span><span class="p">,</span> <span class="n">y</span></div>
+
+
+
+<span class="c1"># @torch.jit.script</span>
+<div class="viewcode-block" id="setup_tridiagonal_matrix">
+<a class="viewcode-back" href="../../../_autosummary/marinade.gotm.diffusion.setup_tridiagonal_matrix.html#marinade.gotm.diffusion.setup_tridiagonal_matrix">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">setup_tridiagonal_matrix</span><span class="p">(</span>
+    <span class="n">value</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span>
+    <span class="n">dt</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span>
+    <span class="n">h</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span>
+    <span class="n">nu</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span>
+    <span class="n">bc_up_type</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="n">bc_down_type</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="n">bc_up_value</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span>
+    <span class="n">bc_down_value</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span>
+    <span class="n">implicitness</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1.0</span><span class="p">,</span>
+    <span class="n">allow_negative</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="n">lsource</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">qsource</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+<span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Set up a batch of tridiagonal matrices for GOTM diffusion operator.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        value (torch.Tensor): Current state of tracer concentrations. [batch, tracer, nlev]</span>
+<span class="sd">        dt (float): Time step</span>
+<span class="sd">        h (torch.Tensor): Layer thickness. [batch, 1, nlev]</span>
+<span class="sd">        nu (torch.Tensor): Turbulent coefficients. [batch, 1, nlev+1]</span>
+<span class="sd">        bc_up_type (str): Type of upper boundary condition. Options: &#39;neumann&#39;, &#39;dirichlet&#39;</span>
+<span class="sd">        bc_down_type (str): Type of lower boundary condition. Options: &#39;neumann&#39;, &#39;dirichlet&#39;</span>
+<span class="sd">        bc_up_value (torch.Tensor): Value of upper boundary condition. Scalar or [batch, (tracer or 1)]</span>
+<span class="sd">        bc_down_value (torch.Tensor): Value of lower boundary condition. Scalar or [batch, (tracer or 1)]</span>
+<span class="sd">        implicitness (float, optional): Implicitness parameter. Defaults to 1.0.</span>
+<span class="sd">        allow_negative (bool, optional): Allow negative values. Defaults to False.</span>
+<span class="sd">        lsource (torch.Tensor, optional): Linear source term. Defaults to None. [batch, (tracer or 1), nlev]</span>
+<span class="sd">        qsource (torch.Tensor, optional): Constant source term. Defaults to None. [batch, (tracer or 1), nlev]</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        Tuple:</span>
+
+<span class="sd">        - a (torch.Tensor): lower diagonal of shape (batch, 1, nlev - 1)</span>
+<span class="sd">        - b (torch.Tensor): main diagonal of shape (batch, (tracer or 1), nlev)</span>
+<span class="sd">        - c (torch.Tensor): upper diagonal of shape (batch, 1, nlev - 1)</span>
+<span class="sd">        - y (torch.Tensor): right-hand side of shape (batch, tracer, nlev)</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">dtype</span> <span class="o">=</span> <span class="n">nu</span><span class="o">.</span><span class="n">dtype</span>
+    <span class="n">device</span> <span class="o">=</span> <span class="n">nu</span><span class="o">.</span><span class="n">device</span>
+
+    <span class="n">batch_size</span><span class="p">,</span> <span class="n">n_tracers</span><span class="p">,</span> <span class="n">n_levels</span> <span class="o">=</span> <span class="n">value</span><span class="o">.</span><span class="n">shape</span>
+
+    <span class="n">au</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">empty</span><span class="p">((</span><span class="n">batch_size</span><span class="p">,</span> <span class="n">nu</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="o">-</span><span class="mi">2</span><span class="p">],</span> <span class="n">n_levels</span> <span class="o">-</span> <span class="mi">1</span><span class="p">),</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">)</span>
+
+    <span class="c1"># do we need a different diagonal coefficient for each tracer? first check if lsource varies over tracers:</span>
+    <span class="n">bu_dim2</span> <span class="o">=</span> <span class="mi">1</span> <span class="k">if</span> <span class="p">(</span><span class="n">lsource</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="n">lsource</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="o">-</span><span class="mi">2</span><span class="p">]</span> <span class="o">==</span> <span class="mi">1</span><span class="p">)</span> <span class="ow">and</span> <span class="n">nu</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="o">-</span><span class="mi">2</span><span class="p">]</span> <span class="o">==</span> <span class="mi">1</span> <span class="k">else</span> <span class="n">n_tracers</span>
+    <span class="c1"># if we need to enforce nonnegativity constraints, then b depends on values and must have a tracer dimension:</span>
+    <span class="k">for</span> <span class="n">bc_type</span><span class="p">,</span> <span class="n">bc_val</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">([</span><span class="n">bc_up_type</span><span class="p">,</span> <span class="n">bc_down_type</span><span class="p">],</span> <span class="p">[</span><span class="n">bc_up_value</span><span class="p">,</span> <span class="n">bc_down_value</span><span class="p">]):</span>
+        <span class="k">if</span> <span class="n">bc_type</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">&quot;flux&quot;</span><span class="p">,</span> <span class="s2">&quot;neumann&quot;</span><span class="p">)</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">allow_negative</span> <span class="ow">and</span> <span class="p">(</span><span class="n">bc_val</span> <span class="o">&lt;</span> <span class="mf">0.0</span><span class="p">)</span><span class="o">.</span><span class="n">any</span><span class="p">():</span>
+            <span class="n">bu_dim2</span> <span class="o">=</span> <span class="n">n_tracers</span>
+    <span class="n">bu</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">empty</span><span class="p">(</span><span class="n">value</span><span class="o">.</span><span class="n">shape</span><span class="p">[:</span><span class="o">-</span><span class="mi">2</span><span class="p">]</span> <span class="o">+</span> <span class="p">(</span><span class="n">bu_dim2</span><span class="p">,</span> <span class="n">n_levels</span><span class="p">),</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">)</span>
+
+    <span class="n">cu</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">empty</span><span class="p">((</span><span class="n">batch_size</span><span class="p">,</span> <span class="n">nu</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="o">-</span><span class="mi">2</span><span class="p">],</span> <span class="n">n_levels</span> <span class="o">-</span> <span class="mi">1</span><span class="p">),</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">)</span>
+    <span class="n">yu</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">empty_like</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+
+    <span class="c1"># Set up the linear system except for boundaries:</span>
+    <span class="n">c</span> <span class="o">=</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">dt</span> <span class="o">*</span> <span class="n">nu</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="mi">2</span><span class="p">:</span><span class="n">n_levels</span><span class="p">]</span> <span class="o">/</span> <span class="p">(</span><span class="n">h</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="mi">1</span> <span class="p">:</span> <span class="n">n_levels</span> <span class="o">-</span> <span class="mi">1</span><span class="p">]</span> <span class="o">+</span> <span class="n">h</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="mi">2</span><span class="p">:</span><span class="n">n_levels</span><span class="p">])</span> <span class="o">/</span> <span class="n">h</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="mi">1</span> <span class="p">:</span> <span class="n">n_levels</span> <span class="o">-</span> <span class="mi">1</span><span class="p">]</span>
+    <span class="n">a</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="mi">2</span>
+        <span class="o">*</span> <span class="n">dt</span>
+        <span class="o">*</span> <span class="n">nu</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="mi">1</span> <span class="p">:</span> <span class="n">n_levels</span> <span class="o">-</span> <span class="mi">1</span><span class="p">]</span>
+        <span class="o">/</span> <span class="p">(</span><span class="n">h</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="mi">1</span> <span class="p">:</span> <span class="n">n_levels</span> <span class="o">-</span> <span class="mi">1</span><span class="p">]</span> <span class="o">+</span> <span class="n">h</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="p">:</span> <span class="n">n_levels</span> <span class="o">-</span> <span class="mi">2</span><span class="p">])</span>
+        <span class="o">/</span> <span class="n">h</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="mi">1</span> <span class="p">:</span> <span class="n">n_levels</span> <span class="o">-</span> <span class="mi">1</span><span class="p">]</span>
+    <span class="p">)</span>
+
+    <span class="n">cu</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="mi">1</span> <span class="p">:</span> <span class="n">n_levels</span> <span class="o">-</span> <span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="o">-</span><span class="n">implicitness</span> <span class="o">*</span> <span class="n">c</span>
+    <span class="n">au</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="mi">0</span> <span class="p">:</span> <span class="n">n_levels</span> <span class="o">-</span> <span class="mi">2</span><span class="p">]</span> <span class="o">=</span> <span class="o">-</span><span class="n">implicitness</span> <span class="o">*</span> <span class="n">a</span>
+
+    <span class="n">ls</span> <span class="o">=</span> <span class="n">tensor</span><span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">)</span> <span class="k">if</span> <span class="n">lsource</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">dt</span> <span class="o">*</span> <span class="n">lsource</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="mi">1</span> <span class="p">:</span> <span class="n">n_levels</span> <span class="o">-</span> <span class="mi">1</span><span class="p">]</span>
+    <span class="n">bu</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="mi">1</span> <span class="p">:</span> <span class="n">n_levels</span> <span class="o">-</span> <span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="mi">1</span> <span class="o">+</span> <span class="n">implicitness</span> <span class="o">*</span> <span class="p">(</span><span class="n">a</span> <span class="o">+</span> <span class="n">c</span><span class="p">)</span> <span class="o">-</span> <span class="n">ls</span>
+
+    <span class="n">qs</span> <span class="o">=</span> <span class="n">tensor</span><span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">)</span> <span class="k">if</span> <span class="n">qsource</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">dt</span> <span class="o">*</span> <span class="n">qsource</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="mi">1</span> <span class="p">:</span> <span class="n">n_levels</span> <span class="o">-</span> <span class="mi">1</span><span class="p">]</span>
+    <span class="n">yu</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="mi">1</span> <span class="p">:</span> <span class="n">n_levels</span> <span class="o">-</span> <span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="n">implicitness</span><span class="p">)</span> <span class="o">*</span> <span class="p">(</span><span class="n">a</span> <span class="o">+</span> <span class="n">c</span><span class="p">))</span> <span class="o">*</span> <span class="n">value</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="mi">1</span> <span class="p">:</span> <span class="n">n_levels</span> <span class="o">-</span> <span class="mi">1</span><span class="p">]</span>
+        <span class="o">+</span> <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="n">implicitness</span><span class="p">)</span> <span class="o">*</span> <span class="p">(</span><span class="n">a</span> <span class="o">*</span> <span class="n">value</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="p">:</span> <span class="n">n_levels</span> <span class="o">-</span> <span class="mi">2</span><span class="p">]</span> <span class="o">+</span> <span class="n">c</span> <span class="o">*</span> <span class="n">value</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="mi">2</span><span class="p">:</span><span class="n">n_levels</span><span class="p">])</span>
+        <span class="o">+</span> <span class="n">qs</span>
+    <span class="p">)</span>
+
+    <span class="c1"># set up the first and last rows, which depend on boundary conditions</span>
+    <span class="k">for</span> <span class="n">i_bc</span><span class="p">,</span> <span class="n">i_adj</span><span class="p">,</span> <span class="n">bc_type</span><span class="p">,</span> <span class="n">bc_val</span><span class="p">,</span> <span class="n">offdiag</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span>
+        <span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">],</span> <span class="p">[</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span> <span class="mi">1</span><span class="p">],</span> <span class="p">[</span><span class="n">bc_up_type</span><span class="p">,</span> <span class="n">bc_down_type</span><span class="p">],</span> <span class="p">[</span><span class="n">bc_up_value</span><span class="p">,</span> <span class="n">bc_down_value</span><span class="p">],</span> <span class="p">[</span><span class="n">au</span><span class="p">,</span> <span class="n">cu</span><span class="p">]</span>
+    <span class="p">):</span>
+        <span class="n">bu</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="n">i_bc</span><span class="p">],</span> <span class="n">offdiag</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="n">i_bc</span><span class="p">],</span> <span class="n">yu</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="n">i_bc</span><span class="p">]</span> <span class="o">=</span> <span class="n">setup_boundary</span><span class="p">(</span>
+            <span class="n">dt</span><span class="p">,</span>
+            <span class="n">implicitness</span><span class="p">,</span>
+            <span class="n">allow_negative</span><span class="p">,</span>
+            <span class="n">h</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="n">i_bc</span><span class="p">],</span>
+            <span class="n">h</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="n">i_adj</span><span class="p">],</span>
+            <span class="n">nu</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="n">i_adj</span><span class="p">],</span>
+            <span class="n">value</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="n">i_bc</span><span class="p">],</span>
+            <span class="n">value</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="n">i_adj</span><span class="p">],</span>
+            <span class="p">(</span><span class="n">tensor</span><span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">)</span> <span class="k">if</span> <span class="n">lsource</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">dt</span> <span class="o">*</span> <span class="n">lsource</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="n">i_bc</span><span class="p">]),</span>
+            <span class="p">(</span><span class="n">tensor</span><span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">)</span> <span class="k">if</span> <span class="n">qsource</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">dt</span> <span class="o">*</span> <span class="n">qsource</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="n">i_bc</span><span class="p">]),</span>
+            <span class="n">bc_type</span><span class="p">,</span>
+            <span class="n">bc_val</span><span class="p">,</span>
+            <span class="n">dtype</span><span class="p">,</span>
+            <span class="n">device</span><span class="p">,</span>
+        <span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">au</span><span class="p">,</span> <span class="n">bu</span><span class="p">,</span> <span class="n">cu</span><span class="p">,</span> <span class="n">yu</span></div>
+
+
+
+<div class="viewcode-block" id="DiffusionOperator">
+<a class="viewcode-back" href="../../../_autosummary/marinade.gotm.diffusion.DiffusionOperator.html#marinade.gotm.diffusion.DiffusionOperator">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">DiffusionOperator</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Diffusion operator class.</span>
+
+<span class="sd">    Should be initialized with the important numerical parameters and schemes for the simulation. Has a *forward* method</span>
+<span class="sd">    for computing a single time step. Calling the operator object itself also calls its *forward* method.</span>
+
+<span class="sd">    The operator solves the one-dimensional diffusion equation:</span>
+
+<span class="sd">    .. math::</span>
+<span class="sd">        \\frac{\partial Y}{\partial t} = \\frac{\partial}{\partial z}\left(\\nu_Y\\frac{\partial Y}{\partial z}\\right)</span>
+<span class="sd">        + Y L_{sour} + Q_{sour}</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        bc_up_type (str): Type of upper boundary condition. &quot;neumann&quot; or &quot;dirichlet&quot;.</span>
+<span class="sd">        bc_down_type (str): Type of lower boundary condition. &quot;neumann&quot; or &quot;dirichlet&quot;.</span>
+<span class="sd">        bc_up_value (Union[float, torch.Tensor]): Value of upper boundary condition. Scalar or [batch, (tracer or 1)]</span>
+<span class="sd">        bc_down_value (Union[float, torch.Tensor]): Value of lower boundary condition. Scalar or [batch, (tracer or 1)]</span>
+<span class="sd">        implicitness (float, optional): Implicitness parameter. Defaults to 1.0.</span>
+<span class="sd">        allow_negative (bool, optional): Allow negative tracer concentration values. Defaults to False.</span>
+<span class="sd">        method (str, optional): Method for tridiagonal solver. One of (&quot;thomas&quot;, &quot;paracr&quot;, &quot;linalg&quot;).</span>
+<span class="sd">            Defaults to &quot;thomas&quot;.</span>
+<span class="sd">        implicit_backward (bool, optional): If True, uses custom backward method based on implicit differentiation.</span>
+<span class="sd">            Defaults to True.</span>
+<span class="sd">        device (str, optional): Device for torch computations. Defaults to &#39;cpu&#39;.</span>
+<span class="sd">        dtype (str, optional): Data type for torch computations. Defaults to &#39;float64&#39;.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">bc_up_type</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">bc_down_type</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">bc_up_value</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">],</span>
+        <span class="n">bc_down_value</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">],</span>
+        <span class="n">implicitness</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1.0</span><span class="p">,</span>
+        <span class="n">allow_negative</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+        <span class="n">method</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;thomas&quot;</span><span class="p">,</span>
+        <span class="n">implicit_backward</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+        <span class="n">device</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;cpu&quot;</span><span class="p">,</span>
+        <span class="n">dtype</span><span class="o">=</span><span class="s2">&quot;float64&quot;</span><span class="p">,</span>
+        <span class="o">*</span><span class="n">args</span><span class="p">,</span>
+        <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
+    <span class="p">):</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">dtype</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+            <span class="n">dtype</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">torch</span><span class="p">,</span> <span class="n">dtype</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">implicitness</span> <span class="o">=</span> <span class="n">implicitness</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">allow_negative</span> <span class="o">=</span> <span class="n">allow_negative</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">bc_up_type</span> <span class="o">=</span> <span class="n">bc_up_type</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">bc_down_type</span> <span class="o">=</span> <span class="n">bc_down_type</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">bc_up_value</span><span class="p">,</span> <span class="nb">int</span><span class="p">):</span>
+            <span class="n">bc_up_value</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">bc_up_value</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">bc_up_value</span> <span class="o">=</span> <span class="n">bc_up_value</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">bc_down_value</span><span class="p">,</span> <span class="nb">int</span><span class="p">):</span>
+            <span class="n">bc_down_value</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">bc_down_value</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">bc_down_value</span> <span class="o">=</span> <span class="n">bc_down_value</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">method</span> <span class="o">=</span> <span class="n">method</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">implicit_backward</span> <span class="o">=</span> <span class="n">implicit_backward</span>
+
+<div class="viewcode-block" id="DiffusionOperator.forward">
+<a class="viewcode-back" href="../../../_autosummary/marinade.gotm.diffusion.DiffusionOperator.html#marinade.gotm.diffusion.DiffusionOperator.forward">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">forward</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">concentration</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">TensorDict</span><span class="p">],</span>
+        <span class="n">dt</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span>
+        <span class="n">h</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span>
+        <span class="n">nu</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span>
+        <span class="n">lsource</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">qsource</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">bc_up_value</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Union</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">bc_down_value</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Union</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Forward function for time stepping operator.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            concentration (Union[torch.Tensor, TensorDict]): The initial tracer concentration field.</span>
+<span class="sd">                Can be a TensorDict. Then this operator acts on *concentration[&quot;pelagic&quot;]*.</span>
+<span class="sd">                This functionality exists because benthic (sediment) variables might be part</span>
+<span class="sd">                of the tracer state, but they are only on the ground and do not diffuse.</span>
+<span class="sd">                [batch, tracer, nlev]</span>
+<span class="sd">            dt (float): Time step.</span>
+<span class="sd">            h (torch.Tensor): Layer heights. [batch, (tracer or 1), nlev]</span>
+<span class="sd">            nu (torch.Tensor): Diffusivity field at cell faces. [batch, (tracer or 1), nlev+1]</span>
+<span class="sd">            lsource (torch.Tensor, optional): Linear source term. Defaults to None.</span>
+<span class="sd">            qsource (torch.Tensor, optional): Constant source term. Defaults to None.</span>
+<span class="sd">            bc_up_value (Union[float, torch.Tensor], optional): Upper boundary condition value. Optional.</span>
+<span class="sd">                If None, the value specified at operator initialization is used. Defaults to None.</span>
+<span class="sd">                Scalar or [batch, (tracer or 1)]</span>
+<span class="sd">            bc_down_value (Union[float, torch.Tensor], optional): Lower boundary condition value. Optional.</span>
+<span class="sd">                If None, the value specified at operator initialization is used. Defaults to None.</span>
+<span class="sd">                Scalar or [batch, (tracer or 1)]</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            Union[torch.Tensor, TensorDict]: Updated system state.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">concentration</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">):</span>
+            <span class="n">x</span> <span class="o">=</span> <span class="n">concentration</span>
+        <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">concentration</span><span class="p">,</span> <span class="n">TensorDict</span><span class="p">):</span>
+            <span class="n">x</span> <span class="o">=</span> <span class="n">concentration</span><span class="p">[</span><span class="s2">&quot;pelagic&quot;</span><span class="p">]</span>
+        <span class="n">x_new</span> <span class="o">=</span> <span class="n">diffuse_at_center</span><span class="p">(</span>
+            <span class="n">x</span><span class="p">,</span>
+            <span class="n">dt</span><span class="p">,</span>
+            <span class="n">h</span><span class="p">,</span>
+            <span class="n">nu</span><span class="p">,</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">bc_up_type</span><span class="p">,</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">bc_down_type</span><span class="p">,</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">bc_up_value</span> <span class="k">if</span> <span class="n">bc_up_value</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">bc_up_value</span><span class="p">,</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">bc_down_value</span> <span class="k">if</span> <span class="n">bc_down_value</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">bc_down_value</span><span class="p">,</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">implicitness</span><span class="p">,</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">allow_negative</span><span class="p">,</span>
+            <span class="n">lsource</span><span class="p">,</span>
+            <span class="n">qsource</span><span class="p">,</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">method</span><span class="p">,</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">implicit_backward</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">concentration</span><span class="p">,</span> <span class="n">TensorDict</span><span class="p">):</span>
+            <span class="n">concentration</span> <span class="o">=</span> <span class="n">concentration</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+            <span class="n">concentration</span><span class="p">[</span><span class="s2">&quot;pelagic&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">x_new</span>
+            <span class="k">return</span> <span class="n">concentration</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">x_new</span></div>
+
+
+    <span class="fm">__call__</span> <span class="o">=</span> <span class="n">forward</span>  <span class="c1"># define alias for simplified calling</span></div>
+
+</pre></div>
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../../../index.html">
+              <img class="logo" src="../../../_static/m-dml_logo_banner_cropped.png" alt="Logo of MARINADE"/>
+            </a></p>
+<h1 class="logo"><a href="../../../index.html">MARINADE</a></h1>
+
+
+
+
+
+
+
+
+
+<search id="searchbox" style="display: none" role="search">
+    <div class="searchformwrapper">
+    <form class="search" action="../../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Search"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script><h3>Navigation</h3>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../index.html">Documentation of MARINADE</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../backward.html">Tridiagonal Backward Pass</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../backward.html#tridiagonal-forward-pass">Tridiagonal Forward Pass</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../_autosummary/marinade.html">marinade</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../../../index.html">Documentation overview</a><ul>
+  <li><a href="../../index.html">Module code</a><ul>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &#169;2026, m-dml team.
+      
+      |
+      Powered by <a href="https://www.sphinx-doc.org/">Sphinx 9.2.0</a>
+      &amp; <a href="https://alabaster.readthedocs.io">Alabaster 1.0.0</a>
+      
+    </div>
+
+    
+
+    
+  </body>
+</html>

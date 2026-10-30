@@ -1,0 +1,32 @@
+BioModel
+========
+
+.. currentmodule:: marinade.fabm.bio_model
+
+.. autoclass:: BioModel
+   :members:
+
+   
+
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+   
+      ~BioModel.__init__
+      ~BioModel.create_model_from_yaml_file
+      ~BioModel.do
+      ~BioModel.do_ppdd
+      ~BioModel.do_repair_state
+      ~BioModel.forward
+      ~BioModel.get_parameters
+      ~BioModel.get_vertical_movement
+      ~BioModel.right_hand_side_ppdd
+      ~BioModel.right_hand_side_rhs
+      ~BioModel.update_parameters
+   
+   
+
+   
+   
+   

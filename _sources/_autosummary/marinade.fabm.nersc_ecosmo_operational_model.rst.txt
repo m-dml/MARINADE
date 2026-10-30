@@ -1,0 +1,33 @@
+nersc\_ecosmo\_operational\_model
+=================================
+
+
+.. automodule:: marinade.fabm.nersc_ecosmo_operational_model
+
+    
+    
+    
+
+   
+   
+   
+
+   
+   
+   
+
+   
+   
+   .. rubric:: Classes
+
+   .. autosummary::
+      :toctree:
+      :template: custom-class.rst
+   
+      NerscEcosmoOperationalModel
+   
+   
+
+   
+   
+   

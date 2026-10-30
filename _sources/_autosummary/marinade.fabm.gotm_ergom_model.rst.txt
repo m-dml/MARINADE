@@ -1,0 +1,33 @@
+gotm\_ergom\_model
+==================
+
+
+.. automodule:: marinade.fabm.gotm_ergom_model
+
+    
+    
+    
+
+   
+   
+   
+
+   
+   
+   
+
+   
+   
+   .. rubric:: Classes
+
+   .. autosummary::
+      :toctree:
+      :template: custom-class.rst
+   
+      GOTMErgomModel
+   
+   
+
+   
+   
+   

@@ -1,0 +1,6 @@
+random\_tridiag\_dd
+===================
+
+.. currentmodule:: marinade.gotm.tridiagonal
+
+.. autofunction:: random_tridiag_dd

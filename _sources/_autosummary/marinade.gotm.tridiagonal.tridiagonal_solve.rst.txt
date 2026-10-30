@@ -1,0 +1,6 @@
+tridiagonal\_solve
+==================
+
+.. currentmodule:: marinade.gotm.tridiagonal
+
+.. autofunction:: tridiagonal_solve

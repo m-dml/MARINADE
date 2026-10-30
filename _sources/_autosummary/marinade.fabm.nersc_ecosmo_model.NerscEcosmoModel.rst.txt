@@ -1,0 +1,35 @@
+NerscEcosmoModel
+================
+
+.. currentmodule:: marinade.fabm.nersc_ecosmo_model
+
+.. autoclass:: NerscEcosmoModel
+   :members:
+
+   
+
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+   
+      ~NerscEcosmoModel.__init__
+      ~NerscEcosmoModel.create_model_from_yaml_file
+      ~NerscEcosmoModel.do
+      ~NerscEcosmoModel.do_bottom
+      ~NerscEcosmoModel.do_ppdd
+      ~NerscEcosmoModel.do_repair_state
+      ~NerscEcosmoModel.do_surface
+      ~NerscEcosmoModel.forward
+      ~NerscEcosmoModel.get_parameters
+      ~NerscEcosmoModel.get_vertical_movement
+      ~NerscEcosmoModel.right_hand_side_ppdd
+      ~NerscEcosmoModel.right_hand_side_rhs
+      ~NerscEcosmoModel.setup_internal_fields
+      ~NerscEcosmoModel.update_parameters
+   
+   
+
+   
+   
+   

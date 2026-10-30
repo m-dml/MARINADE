@@ -1,0 +1,36 @@
+util
+====
+
+
+.. automodule:: marinade.util
+
+    
+    
+    .. rubric:: Modules
+
+    .. autosummary::
+       :toctree:
+       :template: custom-module.rst
+       :recursive:
+    
+       mask_functions
+       ode_solvers
+       temporal_mean
+    
+    
+
+   
+   
+   
+
+   
+   
+   
+
+   
+   
+   
+
+   
+   
+   

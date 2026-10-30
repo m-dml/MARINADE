@@ -1,0 +1,6 @@
+tridiagonal\_solve\_linalg
+==========================
+
+.. currentmodule:: marinade.gotm.tridiagonal
+
+.. autofunction:: tridiagonal_solve_linalg

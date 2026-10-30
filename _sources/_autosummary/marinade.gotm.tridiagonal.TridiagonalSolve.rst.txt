@@ -1,0 +1,32 @@
+TridiagonalSolve
+================
+
+.. currentmodule:: marinade.gotm.tridiagonal
+
+.. autoclass:: TridiagonalSolve
+   :members:
+
+   
+
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+   
+      ~TridiagonalSolve.__init__
+      ~TridiagonalSolve.backward
+      ~TridiagonalSolve.forward
+      ~TridiagonalSolve.jvp
+      ~TridiagonalSolve.setup_context
+   
+   
+
+   
+   
+   .. rubric:: Attributes
+
+   .. autosummary::
+   
+      ~TridiagonalSolve.generate_vmap_rule
+   
+   

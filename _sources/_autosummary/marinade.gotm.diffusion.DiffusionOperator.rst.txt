@@ -1,0 +1,23 @@
+DiffusionOperator
+=================
+
+.. currentmodule:: marinade.gotm.diffusion
+
+.. autoclass:: DiffusionOperator
+   :members:
+
+   
+
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+   
+      ~DiffusionOperator.__init__
+      ~DiffusionOperator.forward
+   
+   
+
+   
+   
+   

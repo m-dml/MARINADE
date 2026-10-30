@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>BioModel &#8212; MARINADE 1.0.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=5ecbeea2" />
+    <link rel="stylesheet" type="text/css" href="../_static/basic.css?v=b08954a9" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css?v=27fed22d" />
+    <script src="../_static/documentation_options.js?v=8d563738"></script>
+    <script src="../_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <link rel="icon" href="../_static/m-dml_logo_dark.png"/>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="gotm_ergom_model" href="marinade.fabm.gotm_ergom_model.html" />
+    <link rel="prev" title="shared_key_tensordicts" href="marinade.fabm.bio_model.shared_key_tensordicts.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+
+  
+  
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="biomodel">
+<h1>BioModel<a class="headerlink" href="#biomodel" title="Link to this heading">¶</a></h1>
+<dl class="py class">
+<dt class="sig sig-object py" id="marinade.fabm.bio_model.BioModel">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">marinade.fabm.bio_model.</span></span><span class="sig-name descname"><span class="pre">BioModel</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ode_method</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">device</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'cpu'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dtype</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">torch.float64</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/marinade/fabm/bio_model.html#BioModel"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#marinade.fabm.bio_model.BioModel" title="Link to this definition">¶</a></dt>
+<dd><p>Extension of the base class for biosystem models that implements crucial methods for modelling biogeochemical
+processes.</p>
+<p>Subclasses should be defined for specific models. They should implement the following methods:
+- <em>do</em>: Calculate derivative vector for pelagic tracer concentrations.
+- <em>do_surface</em>: Optional. Calculate surface derivatives for pelagic tracer concentrations.
+- <em>do_bottom</em>: Optional. Calculate bottom derivatives for pelagic tracer concentrations and derivatives for</p>
+<blockquote>
+<div><p>benthic fields.</p>
+</div></blockquote>
+<p class="rubric">Methods</p>
+<table class="autosummary longtable docutils align-default">
+<tbody>
+<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">__init__</span></code>(ode_method[, device, dtype])</p></td>
+<td><p>Constructor method.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">create_model_from_yaml_file</span></code>(path_fabm, path_gotm)</p></td>
+<td><p>Creates a <em>base_model</em> instance from .yaml configuration files.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#marinade.fabm.bio_model.BioModel.do" title="marinade.fabm.bio_model.BioModel.do"><code class="xref py py-obj docutils literal notranslate"><span class="pre">do</span></code></a>(concentration, dynamic_inputs, *args, ...)</p></td>
+<td><p>Calculate right-hand side of biological time step ODE as a vector with temporal derivatives.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#marinade.fabm.bio_model.BioModel.do_ppdd" title="marinade.fabm.bio_model.BioModel.do_ppdd"><code class="xref py py-obj docutils literal notranslate"><span class="pre">do_ppdd</span></code></a>(concentration, dynamic_inputs, ...)</p></td>
+<td><p>Calculate source/sink terms of biological variables as production and destruction matrices.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#marinade.fabm.bio_model.BioModel.do_repair_state" title="marinade.fabm.bio_model.BioModel.do_repair_state"><code class="xref py py-obj docutils literal notranslate"><span class="pre">do_repair_state</span></code></a>(concentration)</p></td>
+<td><p>Repair function for the states.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#marinade.fabm.bio_model.BioModel.forward" title="marinade.fabm.bio_model.BioModel.forward"><code class="xref py py-obj docutils literal notranslate"><span class="pre">forward</span></code></a>(concentration, dt, dynamic_inputs, ...)</p></td>
+<td><p>Compute the biogeochemical model time step based on the momentary state.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">get_parameters</span></code>()</p></td>
+<td><p>Retrieve the parameters of the model.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#marinade.fabm.bio_model.BioModel.get_vertical_movement" title="marinade.fabm.bio_model.BioModel.get_vertical_movement"><code class="xref py py-obj docutils literal notranslate"><span class="pre">get_vertical_movement</span></code></a>(concentration, ...)</p></td>
+<td><p>Compute vertical movement <em>through</em> the fluid for biological state variables.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#marinade.fabm.bio_model.BioModel.right_hand_side_ppdd" title="marinade.fabm.bio_model.BioModel.right_hand_side_ppdd"><code class="xref py py-obj docutils literal notranslate"><span class="pre">right_hand_side_ppdd</span></code></a>(concentration, ...)</p></td>
+<td><p>Calculate the source/sink terms of biological variables as production and destruction matrices.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#marinade.fabm.bio_model.BioModel.right_hand_side_rhs" title="marinade.fabm.bio_model.BioModel.right_hand_side_rhs"><code class="xref py py-obj docutils literal notranslate"><span class="pre">right_hand_side_rhs</span></code></a>(concentration, ...[, first])</p></td>
+<td><p>Calculate the time derivatives of the state.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">update_parameters</span></code>(parameters)</p></td>
+<td><p>Update the parameters of the model.</p></td>
+</tr>
+</tbody>
+</table>
+<dl class="py method">
+<dt class="sig sig-object py" id="marinade.fabm.bio_model.BioModel.do">
+<span class="sig-name descname"><span class="pre">do</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">concentration</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">tensordict.TensorDict</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">torch.Tensor</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dynamic_inputs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">tensordict.TensorDict</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">tensordict.TensorDict</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">torch.Tensor</span></span></span><a class="reference internal" href="../_modules/marinade/fabm/bio_model.html#BioModel.do"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#marinade.fabm.bio_model.BioModel.do" title="Link to this definition">¶</a></dt>
+<dd><p>Calculate right-hand side of biological time step ODE as a vector with temporal derivatives.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Vector of temporal derivatives</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>Union[TensorDict, torch.Tensor]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="marinade.fabm.bio_model.BioModel.do_ppdd">
+<span class="sig-name descname"><span class="pre">do_ppdd</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">concentration</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">tensordict.TensorDict</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">torch.Tensor</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dynamic_inputs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">tensordict.TensorDict</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">tensordict.TensorDict</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">torch.Tensor</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">tensordict.TensorDict</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">torch.Tensor</span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="../_modules/marinade/fabm/bio_model.html#BioModel.do_ppdd"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#marinade.fabm.bio_model.BioModel.do_ppdd" title="Link to this definition">¶</a></dt>
+<dd><p>Calculate source/sink terms of biological variables as production and destruction matrices.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>production matrices
+Union[TensorDict, torch.Tensor]: destruction matrices</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>Union[TensorDict, torch.Tensor]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="marinade.fabm.bio_model.BioModel.do_repair_state">
+<span class="sig-name descname"><span class="pre">do_repair_state</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">concentration</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">tensordict.TensorDict</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">torch.Tensor</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/marinade/fabm/bio_model.html#BioModel.do_repair_state"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#marinade.fabm.bio_model.BioModel.do_repair_state" title="Link to this definition">¶</a></dt>
+<dd><p>Repair function for the states. In many models, there are maximal or minimal allowed values for certain
+tracers. In particular, there might be a positivity constraint.</p>
+<p>Note that the variable <em>self.repair_state</em> (bool) indicates whether to do repairs.
+Only if True, this function applies corrections.</p>
+<p>The maximum and minimum allowed values should be specified by the model as <em>self.maximum</em>/<em>self.minimum</em>
+(for tensor states) or <em>self.maximum_td</em>/<em>self.minimum_td</em> (for TensorDict states).</p>
+<p>The correction functions should be stored as <em>self.repair_minfunc</em>
+or <em>self.repair_maxfunc</em>, e.g. <em>torch.clamp_min</em>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>concentration</strong> (<em>Union</em><em>[</em><em>TensorDict</em><em>, </em><em>torch.Tensor</em><em>]</em>) – Current state. Can be a tensor or TensorDict
+with key ‘pelagic’ for the submerged tracers.</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>The repaired state</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Union[TensorDict, torch.Tensor]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="marinade.fabm.bio_model.BioModel.forward">
+<span class="sig-name descname"><span class="pre">forward</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">concentration</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">tensordict.TensorDict</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">torch.Tensor</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dt</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">torch.Tensor</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">float</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dynamic_inputs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">tensordict.TensorDict</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">tensordict.TensorDict</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">torch.Tensor</span></span></span><a class="reference internal" href="../_modules/marinade/fabm/bio_model.html#BioModel.forward"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#marinade.fabm.bio_model.BioModel.forward" title="Link to this definition">¶</a></dt>
+<dd><p>Compute the biogeochemical model time step based on the momentary state. Might require additional forcing
+inputs, e.g. incoming radiation, depending on the model.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>concentration</strong> (<em>Union</em><em>[</em><em>TensorDict</em><em>, </em><em>torch.Tensor</em><em>]</em>) – The current tracer concentrations</p></li>
+<li><p><strong>dt</strong> (<em>Union</em><em>[</em><em>torch.Tensor</em><em>, </em><em>float</em><em>]</em>) – The time step of the simulation</p></li>
+<li><p><strong>dynamic_inputs</strong> (<em>TensorDict</em>) – Dict of additional inputs</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>The new tracer concentration field</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Union[TensorDict, torch.Tensor]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="marinade.fabm.bio_model.BioModel.get_vertical_movement">
+<span class="sig-name descname"><span class="pre">get_vertical_movement</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">concentration</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">tensordict.TensorDict</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">torch.Tensor</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dynamic_inputs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">tensordict.TensorDict</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/marinade/fabm/bio_model.html#BioModel.get_vertical_movement"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#marinade.fabm.bio_model.BioModel.get_vertical_movement" title="Link to this definition">¶</a></dt>
+<dd><p>Compute vertical movement <em>through</em> the fluid for biological state variables.</p>
+<p>The default implementation for subclasses of BioModel returns a constant sinking velocity per tracer.
+It should be stored during model initialization as self.ws with the shape [1, tracer, 1].</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>concentration</strong> (<em>Union</em><em>[</em><em>TensorDict</em><em>, </em><em>torch.Tensor</em><em>]</em>) – Momentary concentrations of the model tracers.
+[batch, tracer, nlev]</p></li>
+<li><p><strong>dynamic_inputs</strong> (<em>TensorDict</em>) – Dict of additional inputs.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><dl class="simple">
+<dt>Constant vertical velocity as defined at model initialization.</dt><dd><p>[batch, tracer or 1, nlev]</p>
+</dd>
+</dl>
+</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>torch.Tensor</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="marinade.fabm.bio_model.BioModel.right_hand_side_ppdd">
+<span class="sig-name descname"><span class="pre">right_hand_side_ppdd</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">concentration</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">tensordict.TensorDict</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">torch.Tensor</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dynamic_inputs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">tensordict.TensorDict</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/marinade/fabm/bio_model.html#BioModel.right_hand_side_ppdd"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#marinade.fabm.bio_model.BioModel.right_hand_side_ppdd" title="Link to this definition">¶</a></dt>
+<dd><p>Calculate the source/sink terms of biological variables as production and destruction matrices.</p>
+<p>Not yet implemented.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>concentration</strong> (<em>_type_</em>) – The current state.</p></li>
+<li><p><strong>dynamic_inputs</strong> (<em>_type_</em>) – Inputs to the model, e.g. temperature, salinity, …</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>pp (production matrix)
+Union[TensorDict, torch.Tensor]: dd (destruction matrix)</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Union[TensorDict, torch.Tensor]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="marinade.fabm.bio_model.BioModel.right_hand_side_rhs">
+<span class="sig-name descname"><span class="pre">right_hand_side_rhs</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">concentration</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">tensordict.TensorDict</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">torch.Tensor</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dynamic_inputs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">tensordict.TensorDict</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">first</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">tensordict.TensorDict</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">torch.Tensor</span></span></span><a class="reference internal" href="../_modules/marinade/fabm/bio_model.html#BioModel.right_hand_side_rhs"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#marinade.fabm.bio_model.BioModel.right_hand_side_rhs" title="Link to this definition">¶</a></dt>
+<dd><p>Calculate the time derivatives of the state. Calls self.do, self.do_surface and self.do_bottom, if
+implemented.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>concentration</strong> (<em>Union</em><em>[</em><em>TensorDict</em><em>, </em><em>torch.Tensor</em><em>]</em>) – The current state.</p></li>
+<li><p><strong>dynamic_inputs</strong> (<em>TensorDict</em>) – Inputs to the model, e.g. temperature, salinity, …</p></li>
+<li><p><strong>first</strong> (<em>bool</em><em>, </em><em>optional</em>) – If False, <em>self.do_repair_state</em> is called. Defaults to True.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>The time derivatives of the state</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Union[TensorDict, torch.Tensor]</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/m-dml_logo_banner_cropped.png" alt="Logo of MARINADE"/>
+            </a></p>
+<h1 class="logo"><a href="../index.html">MARINADE</a></h1>
+
+
+
+
+
+
+
+
+
+<search id="searchbox" style="display: none" role="search">
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Search"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script><h3>Navigation</h3>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../index.html">Documentation of MARINADE</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../backward.html">Tridiagonal Backward Pass</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../backward.html#tridiagonal-forward-pass">Tridiagonal Forward Pass</a></li>
+</ul>
+<ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="marinade.html">marinade</a><ul class="current">
+<li class="toctree-l2 current"><a class="reference internal" href="marinade.fabm.html">fabm</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="marinade.fabm.base_model.html">base_model</a></li>
+<li class="toctree-l3 current"><a class="reference internal" href="marinade.fabm.bio_model.html">bio_model</a><ul class="current">
+<li class="toctree-l4"><a class="reference internal" href="marinade.fabm.bio_model.shared_key_tensordicts.html">shared_key_tensordicts</a></li>
+<li class="toctree-l4 current"><a class="current reference internal" href="#">BioModel</a><ul>
+<li class="toctree-l5"><a class="reference internal" href="#marinade.fabm.bio_model.BioModel"><code class="docutils literal notranslate"><span class="pre">BioModel</span></code></a><ul>
+<li class="toctree-l6"><a class="reference internal" href="#marinade.fabm.bio_model.BioModel.do"><code class="docutils literal notranslate"><span class="pre">do()</span></code></a></li>
+<li class="toctree-l6"><a class="reference internal" href="#marinade.fabm.bio_model.BioModel.do_ppdd"><code class="docutils literal notranslate"><span class="pre">do_ppdd()</span></code></a></li>
+<li class="toctree-l6"><a class="reference internal" href="#marinade.fabm.bio_model.BioModel.do_repair_state"><code class="docutils literal notranslate"><span class="pre">do_repair_state()</span></code></a></li>
+<li class="toctree-l6"><a class="reference internal" href="#marinade.fabm.bio_model.BioModel.forward"><code class="docutils literal notranslate"><span class="pre">forward()</span></code></a></li>
+<li class="toctree-l6"><a class="reference internal" href="#marinade.fabm.bio_model.BioModel.get_vertical_movement"><code class="docutils literal notranslate"><span class="pre">get_vertical_movement()</span></code></a></li>
+<li class="toctree-l6"><a class="reference internal" href="#marinade.fabm.bio_model.BioModel.right_hand_side_ppdd"><code class="docutils literal notranslate"><span class="pre">right_hand_side_ppdd()</span></code></a></li>
+<li class="toctree-l6"><a class="reference internal" href="#marinade.fabm.bio_model.BioModel.right_hand_side_rhs"><code class="docutils literal notranslate"><span class="pre">right_hand_side_rhs()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="marinade.fabm.gotm_ergom_model.html">gotm_ergom_model</a></li>
+<li class="toctree-l3"><a class="reference internal" href="marinade.fabm.gotm_light_model.html">gotm_light_model</a></li>
+<li class="toctree-l3"><a class="reference internal" href="marinade.fabm.gotm_npzd_model.html">gotm_npzd_model</a></li>
+<li class="toctree-l3"><a class="reference internal" href="marinade.fabm.nersc_ecosmo_model.html">nersc_ecosmo_model</a></li>
+<li class="toctree-l3"><a class="reference internal" href="marinade.fabm.nersc_ecosmo_operational_model.html">nersc_ecosmo_operational_model</a></li>
+<li class="toctree-l3"><a class="reference internal" href="marinade.fabm.nersc_ecosmo_simple_model.html">nersc_ecosmo_simple_model</a></li>
+<li class="toctree-l3"><a class="reference internal" href="marinade.fabm.passive_model.html">passive_model</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="marinade.gotm.html">gotm</a></li>
+<li class="toctree-l2"><a class="reference internal" href="marinade.util.html">util</a></li>
+</ul>
+</li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="marinade.html">marinade</a><ul>
+  <li><a href="marinade.fabm.html">fabm</a><ul>
+  <li><a href="marinade.fabm.bio_model.html">bio_model</a><ul>
+      <li>Previous: <a href="marinade.fabm.bio_model.shared_key_tensordicts.html" title="previous chapter">shared_key_tensordicts</a></li>
+      <li>Next: <a href="marinade.fabm.gotm_ergom_model.html" title="next chapter">gotm_ergom_model</a></li>
+  </ul></li>
+  </ul></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &#169;2026, m-dml team.
+      
+      |
+      Powered by <a href="https://www.sphinx-doc.org/">Sphinx 9.2.0</a>
+      &amp; <a href="https://alabaster.readthedocs.io">Alabaster 1.0.0</a>
+      
+      |
+      <a href="../_sources/_autosummary/marinade.fabm.bio_model.BioModel.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

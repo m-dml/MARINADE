@@ -1,0 +1,872 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../../../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>marinade.fabm.gotm_ergom_model &#8212; MARINADE 1.0.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=5ecbeea2" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/basic.css?v=b08954a9" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/alabaster.css?v=27fed22d" />
+    <script src="../../../_static/documentation_options.js?v=8d563738"></script>
+    <script src="../../../_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <link rel="icon" href="../../../_static/m-dml_logo_dark.png"/>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" />
+   
+  <link rel="stylesheet" href="../../../_static/custom.css" type="text/css" />
+  
+
+  
+  
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <h1>Source code for marinade.fabm.gotm_ergom_model</h1><div class="highlight"><pre>
+<span></span><span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Union</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">yaml</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">marinade.fabm.bio_model</span><span class="w"> </span><span class="kn">import</span> <span class="n">BioModel</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">tensordict</span><span class="w"> </span><span class="kn">import</span> <span class="n">TensorDict</span>
+
+
+<div class="viewcode-block" id="GOTMErgomModel">
+<a class="viewcode-back" href="../../../_autosummary/marinade.fabm.gotm_ergom_model.GOTMErgomModel.html#marinade.fabm.gotm_ergom_model.GOTMErgomModel">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">GOTMErgomModel</span><span class="p">(</span><span class="n">BioModel</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;This class describes the biosystem model ERGOM introduced by Neumann and Fennel.</span>
+
+<span class="sd">    If created by the constructor method, this model uses the same default parameters as the version of this model</span>
+<span class="sd">    provided by FABM. A model with custom parameters can be created from a .yaml file with</span>
+<span class="sd">    *GOTMErgomModel.create_model_from_yaml_file*.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        ode_method (str): The numerical method for solving the tracer ODE. Supported schemes:</span>
+<span class="sd">            (&quot;FE&quot;: Forward Euler, &quot;RK2&quot;: 2nd order Runge-Kutta, &quot;RK4&quot;: 4th order Runge-Kutta)</span>
+<span class="sd">        fluff (bool, optional): Whether to use an additional benthic tracer. Defaults to False.</span>
+<span class="sd">        model_name (str, optional): The name of the model. Defaults to &quot;ergom&quot;.</span>
+<span class="sd">        device (str, optional): The device where the tensors of the model should be stored. Defaults to &quot;cpu&quot;.</span>
+<span class="sd">        dtype (torch.dtype, optional): The default data type of the model. Defaults to torch.float64.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">ode_method</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">fluff</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+        <span class="n">model_name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;ergom&quot;</span><span class="p">,</span>
+        <span class="n">device</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;cpu&quot;</span><span class="p">,</span>
+        <span class="n">dtype</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">dtype</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">float64</span><span class="p">,</span>
+        <span class="o">*</span><span class="n">args</span><span class="p">,</span>
+        <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
+    <span class="p">):</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">dtype</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+            <span class="n">dtype</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">torch</span><span class="p">,</span> <span class="n">dtype</span><span class="p">)</span>
+
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">ode_method</span><span class="o">=</span><span class="n">ode_method</span><span class="p">,</span> <span class="n">model_name</span><span class="o">=</span><span class="n">model_name</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;sfl_po&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="mf">0.0015</span> <span class="o">/</span> <span class="mi">86400</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;sfl_ni&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="mf">0.09</span> <span class="o">/</span> <span class="mi">86400</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;sfl_am&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="mf">0.07</span> <span class="o">/</span> <span class="mi">86400</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">fluff</span> <span class="o">=</span> <span class="n">fluff</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;p10&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="mf">0.0225</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;p20&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="mf">0.0225</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;p30&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="mf">0.0225</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;zo0&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="mf">0.0225</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;kc&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="mf">0.03</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;i_min&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="mf">25.0</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;r1max&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="mf">2.0</span> <span class="o">/</span> <span class="mi">86400</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;r2max&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="mf">0.7</span> <span class="o">/</span> <span class="mi">86400</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;r3max&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="mf">0.5</span> <span class="o">/</span> <span class="mi">86400</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;alpha1&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="mf">1.35</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;alpha2&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="mf">0.675</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;alpha3&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="mf">0.5</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;lpa&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="mf">0.01</span> <span class="o">/</span> <span class="mi">86400</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;lpd&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="mf">0.02</span> <span class="o">/</span> <span class="mi">86400</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;tf&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="mf">10.0</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;tbg&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="mf">14.0</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;beta_bg&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="mf">1.0</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;g1max&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="mf">0.5</span> <span class="o">/</span> <span class="mi">86400</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;g2max&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="mf">0.5</span> <span class="o">/</span> <span class="mi">86400</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;g3max&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="mf">0.25</span> <span class="o">/</span> <span class="mi">86400</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;lza&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="mf">0.0666666666</span> <span class="o">/</span> <span class="mi">86400</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;lzd&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="mf">0.1333333333</span> <span class="o">/</span> <span class="mi">86400</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;iv&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="mf">0.24444444</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;topt&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="mf">20.0</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;lan&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="mf">0.1</span> <span class="o">/</span> <span class="mi">86400</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;oan&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="mf">0.01</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;beta_an&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="mf">0.11</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;lda&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="mf">0.003</span> <span class="o">/</span> <span class="mi">86400</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;tda&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="mf">13.0</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;beta_da&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="mf">20.0</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;pvel&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="mf">5.0</span> <span class="o">/</span> <span class="mi">86400</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;sr&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="mf">0.0625</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;s1&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="mf">5.3</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;s2&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="mf">6.625</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;s3&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="mf">8.625</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;s4&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="mf">2.0</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;a0&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="mf">31.25</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;a1&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="mf">14.603</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;a2&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="mf">0.4025</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">)</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">fluff</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;lds&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="mf">3.5</span> <span class="o">/</span> <span class="mi">86400</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;lsd&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="mf">25.0</span> <span class="o">/</span> <span class="mi">86400</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;tau_crit&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="mf">0.07</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;lsa&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="mf">0.001</span> <span class="o">/</span> <span class="mi">86400</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;bsa&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="mf">0.15</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;ph1&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="mf">0.15</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;ph2&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="mf">0.1</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;w_p1&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="o">-</span><span class="mf">1.0</span> <span class="o">/</span> <span class="mi">86400</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;w_p2&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="o">-</span><span class="mf">5.0</span> <span class="o">/</span> <span class="mi">86400</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;w_p3&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="o">-</span><span class="mf">5.0</span> <span class="o">/</span> <span class="mi">86400</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;w_de&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="o">-</span><span class="mf">3.0</span> <span class="o">/</span> <span class="mi">86400</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">tracer_names</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span>
+            <span class="p">[</span>
+                <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">model_name</span><span class="si">}</span><span class="s2">_dia&quot;</span><span class="p">,</span>
+                <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">model_name</span><span class="si">}</span><span class="s2">_fla&quot;</span><span class="p">,</span>
+                <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">model_name</span><span class="si">}</span><span class="s2">_cya&quot;</span><span class="p">,</span>
+                <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">model_name</span><span class="si">}</span><span class="s2">_zoo&quot;</span><span class="p">,</span>
+                <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">model_name</span><span class="si">}</span><span class="s2">_det&quot;</span><span class="p">,</span>
+                <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">model_name</span><span class="si">}</span><span class="s2">_amm&quot;</span><span class="p">,</span>
+                <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">model_name</span><span class="si">}</span><span class="s2">_nit&quot;</span><span class="p">,</span>
+                <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">model_name</span><span class="si">}</span><span class="s2">_pho&quot;</span><span class="p">,</span>
+                <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">model_name</span><span class="si">}</span><span class="s2">_oxy&quot;</span><span class="p">,</span>
+            <span class="p">]</span>
+        <span class="p">)</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">fluff</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">benthic_tracer_names</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">model_name</span><span class="si">}</span><span class="s2">_flf&quot;</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">dependencies</span><span class="o">.</span><span class="n">extend</span><span class="p">([</span><span class="s2">&quot;temp&quot;</span><span class="p">,</span> <span class="s2">&quot;salt&quot;</span><span class="p">,</span> <span class="s2">&quot;taub&quot;</span><span class="p">,</span> <span class="s2">&quot;wind&quot;</span><span class="p">])</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;wo&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="mf">30.0</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;wn&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="mf">0.1</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">)</span>
+
+        <span class="c1"># constants for osat_weiss:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">aa1</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="o">-</span><span class="mf">173.4292</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">aa2</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="mf">249.6339</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">a3</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="mf">143.3483</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">a4</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="o">-</span><span class="mf">21.8492</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">b1</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="o">-</span><span class="mf">0.033096</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">b2</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="mf">0.014259</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">b3</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="o">-</span><span class="mf">0.001700</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">kelvin</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="mf">273.16</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">mol_per_liter</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="mf">44.661</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">)</span>
+
+        <span class="c1"># constants for do_bottom</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">dot2</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="mf">0.2</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">setup_internal_fields</span><span class="p">(</span><span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">)</span>
+
+<div class="viewcode-block" id="GOTMErgomModel.setup_internal_fields">
+<a class="viewcode-back" href="../../../_autosummary/marinade.fabm.gotm_ergom_model.GOTMErgomModel.html#marinade.fabm.gotm_ergom_model.GOTMErgomModel.setup_internal_fields">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">setup_internal_fields</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">device</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">dtype</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">dtype</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Routine for setting up internal fields that depend on internal parameters.&quot;&quot;&quot;</span>
+
+        <span class="n">_zero</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">zeros_like</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;w_p1&quot;</span><span class="p">],</span> <span class="n">requires_grad</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+        <span class="n">_ws</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;w_p1&quot;</span><span class="p">],</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;w_p2&quot;</span><span class="p">],</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;w_p3&quot;</span><span class="p">],</span>
+            <span class="n">_zero</span><span class="p">,</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;w_de&quot;</span><span class="p">],</span>
+            <span class="n">_zero</span><span class="p">,</span>
+            <span class="n">_zero</span><span class="p">,</span>
+            <span class="n">_zero</span><span class="p">,</span>
+            <span class="n">_zero</span><span class="p">,</span>
+        <span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">ws</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">stack</span><span class="p">(</span><span class="n">_ws</span><span class="p">)</span><span class="o">.</span><span class="n">unsqueeze</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span><span class="o">.</span><span class="n">unsqueeze</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+
+        <span class="n">_minimum</span> <span class="o">=</span> <span class="p">[</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="o">-</span><span class="n">torch</span><span class="o">.</span><span class="n">inf</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">minimum</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="n">_minimum</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">)</span><span class="o">.</span><span class="n">unsqueeze</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span><span class="o">.</span><span class="n">unsqueeze</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">minimum_td</span> <span class="o">=</span> <span class="n">TensorDict</span><span class="p">({</span><span class="s2">&quot;pelagic&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">minimum</span><span class="p">,</span> <span class="s2">&quot;benthic&quot;</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="mi">1</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">)})</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">light_attenuation_indexes</span> <span class="o">=</span> <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">4</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">light_attenuation_scale_factor</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;kc&quot;</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">light_attenuation_background</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;p10&quot;</span><span class="p">]</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;p20&quot;</span><span class="p">]</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;p30&quot;</span><span class="p">]</span>
+        <span class="p">)</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;kc&quot;</span><span class="p">]</span></div>
+
+
+<div class="viewcode-block" id="GOTMErgomModel.create_model_from_yaml_file">
+<a class="viewcode-back" href="../../../_autosummary/marinade.fabm.gotm_ergom_model.GOTMErgomModel.html#marinade.fabm.gotm_ergom_model.GOTMErgomModel.create_model_from_yaml_file">[docs]</a>
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">create_model_from_yaml_file</span><span class="p">(</span>
+        <span class="bp">cls</span><span class="p">,</span>
+        <span class="n">path_fabm</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">path_gotm</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">device</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;cpu&quot;</span><span class="p">,</span>
+        <span class="n">dtype</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">dtype</span><span class="p">]</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">float64</span><span class="p">,</span>
+        <span class="o">*</span><span class="n">args</span><span class="p">,</span>
+        <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
+    <span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Creates a GOTMErgomModel instance from .yaml configuration files. Should generally be used instead of the</span>
+<span class="sd">        constructor. Designed to be compatible with the configuration files of GOTM.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            path_fabm (str): Path to the FABM .yaml configuration file</span>
+<span class="sd">            path_gotm (str): Path to the GOTM .yaml configuration file</span>
+<span class="sd">            device (str, optional): Torch device. Defaults to &quot;cpu&quot;.</span>
+<span class="sd">            dtype (str or torch.dtype, optional): Torch data type. Defaults to torch.float64.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            GOTMErgomModel: The generated model</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">_parameters</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="s2">&quot;p10&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;p20&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;p30&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;zo0&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;kc&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;i_min&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;alpha1&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;alpha2&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;alpha3&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;tf&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;tbg&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;beta_bg&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;iv&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;topt&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;oan&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;beta_an&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;tda&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;beta_da&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;sr&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;s1&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;s2&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;s3&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;s4&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;a0&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;a1&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;a2&quot;</span><span class="p">,</span>
+        <span class="p">]</span>  <span class="c1"># , &#39;dic_per_n&#39;]</span>
+        <span class="n">_parameters_daily</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="s2">&quot;sfl_po&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;sfl_ni&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;sfl_am&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;r1max&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;r2max&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;r3max&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;lpa&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;lpd&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;g1max&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;g2max&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;g3max&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;lza&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;lzd&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;lan&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;lda&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;pvel&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;w_p1&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;w_p2&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;w_p3&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;w_de&quot;</span><span class="p">,</span>
+        <span class="p">]</span>
+        <span class="n">_parameters_fluff</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;tau_crit&quot;</span><span class="p">,</span> <span class="s2">&quot;bsa&quot;</span><span class="p">,</span> <span class="s2">&quot;ph1&quot;</span><span class="p">,</span> <span class="s2">&quot;ph2&quot;</span><span class="p">]</span>
+        <span class="n">_parameters_fluff_daily</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;lds&quot;</span><span class="p">,</span> <span class="s2">&quot;lsd&quot;</span><span class="p">,</span> <span class="s2">&quot;lsa&quot;</span><span class="p">]</span>
+        <span class="n">_seconds_per_day</span> <span class="o">=</span> <span class="mf">86400.0</span>
+
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">dtype</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+            <span class="n">dtype</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">torch</span><span class="p">,</span> <span class="n">dtype</span><span class="p">)</span>
+
+        <span class="c1"># load the GOTM and FABM .yaml config files:</span>
+        <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">path_gotm</span><span class="p">,</span> <span class="s2">&quot;r&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">file_gotm</span><span class="p">:</span>
+            <span class="n">config_gotm</span> <span class="o">=</span> <span class="n">yaml</span><span class="o">.</span><span class="n">safe_load</span><span class="p">(</span><span class="n">file_gotm</span><span class="p">)</span>
+        <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">path_fabm</span><span class="p">,</span> <span class="s2">&quot;r&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">file_fabm</span><span class="p">:</span>
+            <span class="n">config_fabm</span> <span class="o">=</span> <span class="n">yaml</span><span class="o">.</span><span class="n">safe_load</span><span class="p">(</span><span class="n">file_fabm</span><span class="p">)</span>
+
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">ode_method</span> <span class="o">=</span> <span class="n">config_gotm</span><span class="p">[</span><span class="s2">&quot;fabm&quot;</span><span class="p">][</span><span class="s2">&quot;numerics&quot;</span><span class="p">][</span><span class="s2">&quot;ode_method&quot;</span><span class="p">]</span>
+        <span class="k">except</span> <span class="p">(</span><span class="ne">KeyError</span><span class="p">,</span> <span class="ne">ValueError</span><span class="p">,</span> <span class="ne">TypeError</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;fabm/numerics/ode_method missing or invalid in </span><span class="si">{</span><span class="n">path_gotm</span><span class="si">}</span><span class="s2">.&quot;</span><span class="p">)</span>
+
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">repair_state</span> <span class="o">=</span> <span class="n">config_gotm</span><span class="p">[</span><span class="s2">&quot;fabm&quot;</span><span class="p">][</span><span class="s2">&quot;repair_state&quot;</span><span class="p">]</span>
+        <span class="k">except</span> <span class="p">(</span><span class="ne">KeyError</span><span class="p">,</span> <span class="ne">ValueError</span><span class="p">,</span> <span class="ne">TypeError</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;fabm/repair_state missing or invalid in </span><span class="si">{</span><span class="n">path_gotm</span><span class="si">}</span><span class="s2">.&quot;</span><span class="p">)</span>
+
+        <span class="n">model</span> <span class="o">=</span> <span class="kc">None</span>  <span class="c1"># cls(device=device, ode_method=ode_method, dtype=dtype, *args, **kwargs)</span>
+
+        <span class="k">for</span> <span class="n">name_instance</span><span class="p">,</span> <span class="n">config_instance</span> <span class="ow">in</span> <span class="n">config_fabm</span><span class="p">[</span><span class="s2">&quot;instances&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="k">if</span> <span class="n">config_instance</span><span class="p">[</span><span class="s2">&quot;model&quot;</span><span class="p">]</span> <span class="o">==</span> <span class="s2">&quot;gotm/ergom&quot;</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">model</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                    <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;More than one NPZD model detected in file </span><span class="si">{</span><span class="n">file_fabm</span><span class="si">}</span><span class="s2">!&quot;</span><span class="p">)</span>
+
+                <span class="k">try</span><span class="p">:</span>
+                    <span class="n">fluff</span> <span class="o">=</span> <span class="n">config_instance</span><span class="p">[</span><span class="s2">&quot;parameters&quot;</span><span class="p">][</span><span class="s2">&quot;fluff&quot;</span><span class="p">]</span>
+                <span class="k">except</span> <span class="p">(</span><span class="ne">KeyError</span><span class="p">,</span> <span class="ne">ValueError</span><span class="p">,</span> <span class="ne">TypeError</span><span class="p">):</span>
+                    <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                        <span class="sa">f</span><span class="s2">&quot;instances/</span><span class="si">{</span><span class="n">name_instance</span><span class="si">}</span><span class="s2">/parameters/fluff missing or invalid &quot;</span>
+                        <span class="sa">f</span><span class="s2">&quot;in </span><span class="si">{</span><span class="n">path_fabm</span><span class="si">}</span><span class="s2">. Expected type bool.&quot;</span>
+                    <span class="p">)</span>
+                <span class="n">model</span> <span class="o">=</span> <span class="bp">cls</span><span class="p">(</span>
+                    <span class="n">fluff</span><span class="o">=</span><span class="n">fluff</span><span class="p">,</span>
+                    <span class="n">model_name</span><span class="o">=</span><span class="n">name_instance</span><span class="p">,</span>
+                    <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span>
+                    <span class="n">ode_method</span><span class="o">=</span><span class="n">ode_method</span><span class="p">,</span>
+                    <span class="n">repair_state</span><span class="o">=</span><span class="n">repair_state</span><span class="p">,</span>
+                    <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">,</span>
+                    <span class="o">*</span><span class="n">args</span><span class="p">,</span>
+                    <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
+                <span class="p">)</span>
+                <span class="k">if</span> <span class="n">fluff</span><span class="p">:</span>
+                    <span class="n">_parameters</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">_parameters_fluff</span><span class="p">)</span>
+                    <span class="n">_parameters_daily</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">_parameters_fluff_daily</span><span class="p">)</span>
+
+                <span class="k">for</span> <span class="n">_name</span> <span class="ow">in</span> <span class="n">_parameters</span><span class="p">:</span>
+                    <span class="k">try</span><span class="p">:</span>
+                        <span class="n">model</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="n">_name</span><span class="p">]</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span>
+                            <span class="n">config_instance</span><span class="p">[</span><span class="s2">&quot;parameters&quot;</span><span class="p">][</span><span class="n">_name</span><span class="p">],</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span>
+                        <span class="p">)</span>
+                    <span class="k">except</span> <span class="p">(</span><span class="ne">KeyError</span><span class="p">,</span> <span class="ne">ValueError</span><span class="p">,</span> <span class="ne">TypeError</span><span class="p">):</span>
+                        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Printing missing parameters for yaml file:&quot;</span><span class="p">)</span>
+                        <span class="k">for</span> <span class="n">name0</span> <span class="ow">in</span> <span class="n">_parameters</span><span class="p">:</span>
+                            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;      </span><span class="si">{</span><span class="n">name0</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="nb">getattr</span><span class="p">(</span><span class="n">model</span><span class="p">,</span><span class="w"> </span><span class="n">name0</span><span class="p">)</span><span class="si">}</span><span class="s2">  # default = </span><span class="si">{</span><span class="nb">getattr</span><span class="p">(</span><span class="n">model</span><span class="p">,</span><span class="w"> </span><span class="n">name0</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+                        <span class="k">for</span> <span class="n">name0</span> <span class="ow">in</span> <span class="n">_parameters_daily</span><span class="p">:</span>
+                            <span class="nb">print</span><span class="p">(</span>
+                                <span class="sa">f</span><span class="s2">&quot;      </span><span class="si">{</span><span class="n">name0</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="nb">getattr</span><span class="p">(</span><span class="n">model</span><span class="p">,</span><span class="w"> </span><span class="n">name0</span><span class="p">)</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">_seconds_per_day</span><span class="si">}</span><span class="s2">  &quot;</span>
+                                <span class="o">+</span> <span class="sa">f</span><span class="s2">&quot;# default = </span><span class="si">{</span><span class="nb">getattr</span><span class="p">(</span><span class="n">model</span><span class="p">,</span><span class="w"> </span><span class="n">name0</span><span class="p">)</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">_seconds_per_day</span><span class="si">}</span><span class="s2">&quot;</span>
+                            <span class="p">)</span>
+                        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                            <span class="sa">f</span><span class="s2">&quot;instances/</span><span class="si">{</span><span class="n">name_instance</span><span class="si">}</span><span class="s2">/parameters/</span><span class="si">{</span><span class="n">_name</span><span class="si">}</span><span class="s2"> missing or invalid &quot;</span>
+                            <span class="sa">f</span><span class="s2">&quot;in </span><span class="si">{</span><span class="n">path_fabm</span><span class="si">}</span><span class="s2">. Expected type float.&quot;</span>
+                        <span class="p">)</span>
+                <span class="k">for</span> <span class="n">_name</span> <span class="ow">in</span> <span class="n">_parameters_daily</span><span class="p">:</span>
+                    <span class="k">try</span><span class="p">:</span>
+                        <span class="n">model</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="n">_name</span><span class="p">]</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span>
+                            <span class="n">config_instance</span><span class="p">[</span><span class="s2">&quot;parameters&quot;</span><span class="p">][</span><span class="n">_name</span><span class="p">]</span> <span class="o">/</span> <span class="n">_seconds_per_day</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span>
+                        <span class="p">)</span>
+                    <span class="k">except</span> <span class="p">(</span><span class="ne">KeyError</span><span class="p">,</span> <span class="ne">ValueError</span><span class="p">,</span> <span class="ne">TypeError</span><span class="p">):</span>
+                        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Printing missing parameters for yaml file:&quot;</span><span class="p">)</span>
+                        <span class="k">for</span> <span class="n">name0</span> <span class="ow">in</span> <span class="n">_parameters</span><span class="p">:</span>
+                            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;      </span><span class="si">{</span><span class="n">name0</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="nb">getattr</span><span class="p">(</span><span class="n">model</span><span class="p">,</span><span class="w"> </span><span class="n">name0</span><span class="p">)</span><span class="si">}</span><span class="s2">  # default = </span><span class="si">{</span><span class="nb">getattr</span><span class="p">(</span><span class="n">model</span><span class="p">,</span><span class="w"> </span><span class="n">name0</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+                        <span class="k">for</span> <span class="n">name0</span> <span class="ow">in</span> <span class="n">_parameters_daily</span><span class="p">:</span>
+                            <span class="nb">print</span><span class="p">(</span>
+                                <span class="sa">f</span><span class="s2">&quot;      </span><span class="si">{</span><span class="n">name0</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="nb">getattr</span><span class="p">(</span><span class="n">model</span><span class="p">,</span><span class="w"> </span><span class="n">name0</span><span class="p">)</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">_seconds_per_day</span><span class="si">}</span><span class="s2">  &quot;</span>
+                                <span class="o">+</span> <span class="sa">f</span><span class="s2">&quot;# default = </span><span class="si">{</span><span class="nb">getattr</span><span class="p">(</span><span class="n">model</span><span class="p">,</span><span class="w"> </span><span class="n">name0</span><span class="p">)</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">_seconds_per_day</span><span class="si">}</span><span class="s2">&quot;</span>
+                            <span class="p">)</span>
+                        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                            <span class="sa">f</span><span class="s2">&quot;instances/</span><span class="si">{</span><span class="n">name_instance</span><span class="si">}</span><span class="s2">/parameters/</span><span class="si">{</span><span class="n">_name</span><span class="si">}</span><span class="s2"> missing or invalid &quot;</span>
+                            <span class="sa">f</span><span class="s2">&quot;in </span><span class="si">{</span><span class="n">path_fabm</span><span class="si">}</span><span class="s2">. Expected type float.&quot;</span>
+                        <span class="p">)</span>
+        <span class="k">if</span> <span class="n">model</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;No NPZD model detected in file </span><span class="si">{</span><span class="n">file_fabm</span><span class="si">}</span><span class="s2">! Please specify an NPZD model according to the following</span><span class="se">\</span>
+<span class="s2">                    template:</span><span class="se">\n</span><span class="s2">instances:</span><span class="se">\n</span><span class="s2">  npzd:</span><span class="se">\n</span><span class="s2">    model: gotm/npzd</span><span class="se">\n</span><span class="s2">    parameters:</span><span class="se">\n</span><span class="s2">      p0  :  0.0225  #</span><span class="se">\</span>
+<span class="s2">                    default</span><span class="se">\n</span><span class="s2">      z0  :  0.0225  # default</span><span class="se">\n</span><span class="s2">      ...&quot;</span>
+            <span class="p">)</span>
+
+        <span class="n">model</span><span class="o">.</span><span class="n">setup_internal_fields</span><span class="p">(</span><span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">model</span></div>
+
+
+<div class="viewcode-block" id="GOTMErgomModel.update_parameters">
+<a class="viewcode-back" href="../../../_autosummary/marinade.fabm.gotm_ergom_model.GOTMErgomModel.html#marinade.fabm.gotm_ergom_model.GOTMErgomModel.update_parameters">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">update_parameters</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">parameters</span><span class="p">:</span> <span class="n">TensorDict</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Update the parameters of the model.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            parameters (TensorDict): The model parameters to be updated</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">update_parameters</span><span class="p">(</span><span class="n">parameters</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="nb">any</span><span class="p">(</span><span class="n">k</span> <span class="ow">in</span> <span class="n">parameters</span> <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">&quot;w_p1&quot;</span><span class="p">,</span> <span class="s2">&quot;w_p2&quot;</span><span class="p">,</span> <span class="s2">&quot;w_p3&quot;</span><span class="p">,</span> <span class="s2">&quot;w_de&quot;</span><span class="p">)):</span>
+            <span class="n">_zero</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">zeros_like</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;w_p1&quot;</span><span class="p">],</span> <span class="n">requires_grad</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+            <span class="n">_ws</span> <span class="o">=</span> <span class="p">[</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;w_p1&quot;</span><span class="p">],</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;w_p2&quot;</span><span class="p">],</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;w_p3&quot;</span><span class="p">],</span>
+                <span class="n">_zero</span><span class="p">,</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;w_de&quot;</span><span class="p">],</span>
+                <span class="n">_zero</span><span class="p">,</span>
+                <span class="n">_zero</span><span class="p">,</span>
+                <span class="n">_zero</span><span class="p">,</span>
+                <span class="n">_zero</span><span class="p">,</span>
+            <span class="p">]</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">ws</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">stack</span><span class="p">(</span><span class="n">_ws</span><span class="p">)</span><span class="o">.</span><span class="n">unsqueeze</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span><span class="o">.</span><span class="n">unsqueeze</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="s2">&quot;kc&quot;</span> <span class="ow">in</span> <span class="n">parameters</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">light_attenuation_scale_factor</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;kc&quot;</span><span class="p">]</span>
+        <span class="k">if</span> <span class="nb">any</span><span class="p">(</span><span class="n">k</span> <span class="ow">in</span> <span class="n">parameters</span> <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">&quot;p10&quot;</span><span class="p">,</span> <span class="s2">&quot;p20&quot;</span><span class="p">,</span> <span class="s2">&quot;p30&quot;</span><span class="p">,</span> <span class="s2">&quot;kc&quot;</span><span class="p">)):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">light_attenuation_background</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;p10&quot;</span><span class="p">]</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;p20&quot;</span><span class="p">]</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;p30&quot;</span><span class="p">]</span>
+            <span class="p">)</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;kc&quot;</span><span class="p">]</span></div>
+
+
+<div class="viewcode-block" id="GOTMErgomModel.th">
+<a class="viewcode-back" href="../../../_autosummary/marinade.fabm.gotm_ergom_model.GOTMErgomModel.html#marinade.fabm.gotm_ergom_model.GOTMErgomModel.th">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">th</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">w</span><span class="p">,</span> <span class="nb">min</span><span class="p">,</span> <span class="nb">max</span><span class="p">):</span>
+<span class="w">        </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Helper method: Smooth approximation of heaviside function.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">w</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">):</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">mask_func</span><span class="p">(</span>
+                <span class="n">w</span> <span class="o">-</span> <span class="mf">1.0e-10</span><span class="p">,</span>
+                <span class="nb">min</span>
+                <span class="o">+</span> <span class="p">(</span><span class="nb">max</span> <span class="o">-</span> <span class="nb">min</span><span class="p">)</span>
+                <span class="o">*</span> <span class="mf">0.5</span>
+                <span class="o">*</span> <span class="p">(</span><span class="mf">1.0</span> <span class="o">+</span> <span class="n">torch</span><span class="o">.</span><span class="n">tanh</span><span class="p">(</span><span class="n">x</span> <span class="o">/</span> <span class="n">torch</span><span class="o">.</span><span class="n">clamp_min</span><span class="p">(</span><span class="n">w</span><span class="p">,</span> <span class="mf">1.0e-10</span><span class="p">))),</span>  <span class="c1"># prevent nan values in gradient</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">mask_func</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">),</span>
+            <span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">w</span> <span class="o">&gt;</span> <span class="mf">1.0e-10</span><span class="p">:</span>
+                <span class="k">return</span> <span class="nb">min</span> <span class="o">+</span> <span class="p">(</span><span class="nb">max</span> <span class="o">-</span> <span class="nb">min</span><span class="p">)</span> <span class="o">*</span> <span class="mf">0.5</span> <span class="o">*</span> <span class="p">(</span><span class="mf">1.0</span> <span class="o">+</span> <span class="n">torch</span><span class="o">.</span><span class="n">tanh</span><span class="p">(</span><span class="n">x</span> <span class="o">/</span> <span class="n">w</span><span class="p">))</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">mask_func</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="GOTMErgomModel.yy">
+<a class="viewcode-back" href="../../../_autosummary/marinade.fabm.gotm_ergom_model.GOTMErgomModel.html#marinade.fabm.gotm_ergom_model.GOTMErgomModel.yy">[docs]</a>
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">yy</span><span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="n">x</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Helper method: Squared Michaelis-Menten limiter for nutrient uptake.</span>
+
+<span class="sd">        See GOTM/FABM source code and documentation for further information.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="n">x</span> <span class="o">*</span> <span class="n">x</span> <span class="o">/</span> <span class="p">(</span><span class="n">a</span> <span class="o">*</span> <span class="n">a</span> <span class="o">+</span> <span class="n">x</span> <span class="o">*</span> <span class="n">x</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="GOTMErgomModel.fpz">
+<a class="viewcode-back" href="../../../_autosummary/marinade.fabm.gotm_ergom_model.GOTMErgomModel.html#marinade.fabm.gotm_ergom_model.GOTMErgomModel.fpz">[docs]</a>
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">fpz</span><span class="p">(</span><span class="n">iv</span><span class="p">,</span> <span class="n">g</span><span class="p">,</span> <span class="n">t</span><span class="p">,</span> <span class="n">topt</span><span class="p">,</span> <span class="n">psum</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Helper method for calculating zooplankton grazing, see GOTM/FABM source code and documentation.&quot;&quot;&quot;</span>
+        <span class="n">t_topt</span> <span class="o">=</span> <span class="n">t</span> <span class="o">/</span> <span class="n">topt</span>
+        <span class="k">return</span> <span class="n">g</span> <span class="o">*</span> <span class="p">(</span><span class="mf">1.0</span> <span class="o">+</span> <span class="n">t_topt</span> <span class="o">*</span> <span class="n">t_topt</span> <span class="o">*</span> <span class="n">torch</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="mf">1.0</span> <span class="o">-</span> <span class="mf">2.0</span> <span class="o">*</span> <span class="n">t_topt</span><span class="p">))</span> <span class="o">*</span> <span class="p">(</span><span class="mf">1.0</span> <span class="o">-</span> <span class="n">torch</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="o">-</span><span class="n">iv</span> <span class="o">*</span> <span class="n">iv</span> <span class="o">*</span> <span class="n">psum</span> <span class="o">*</span> <span class="n">psum</span><span class="p">))</span></div>
+
+
+<div class="viewcode-block" id="GOTMErgomModel.osat_weiss">
+<a class="viewcode-back" href="../../../_autosummary/marinade.fabm.gotm_ergom_model.GOTMErgomModel.html#marinade.fabm.gotm_ergom_model.GOTMErgomModel.osat_weiss">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">osat_weiss</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">t</span><span class="p">,</span> <span class="n">s</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Helper method for calculating oxygen saturation.&quot;&quot;&quot;</span>
+        <span class="n">tk</span> <span class="o">=</span> <span class="p">(</span><span class="n">t</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">kelvin</span><span class="p">)</span> <span class="o">*</span> <span class="mf">0.01</span>
+        <span class="k">return</span> <span class="p">(</span>
+            <span class="n">torch</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">aa1</span>
+                <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">aa2</span> <span class="o">/</span> <span class="n">tk</span>
+                <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">a3</span> <span class="o">*</span> <span class="n">torch</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">tk</span><span class="p">)</span>
+                <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">a4</span> <span class="o">*</span> <span class="n">tk</span>
+                <span class="o">+</span> <span class="n">s</span> <span class="o">*</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">b1</span> <span class="o">+</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">b2</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">b3</span> <span class="o">*</span> <span class="n">tk</span><span class="p">)</span> <span class="o">*</span> <span class="n">tk</span><span class="p">)</span>
+            <span class="p">)</span>
+            <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">mol_per_liter</span>
+        <span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="GOTMErgomModel.do">
+<a class="viewcode-back" href="../../../_autosummary/marinade.fabm.gotm_ergom_model.GOTMErgomModel.html#marinade.fabm.gotm_ergom_model.GOTMErgomModel.do">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">do</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">concentration</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">TensorDict</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">],</span> <span class="n">dynamic_inputs</span><span class="p">:</span> <span class="n">TensorDict</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Union</span><span class="p">[</span><span class="n">TensorDict</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Calculate right-hand side of biological time step ODE as a vector with temporal derivatives.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            concentration (Union[TensorDict, torch.Tensor]): The current system state.</span>
+<span class="sd">                Should have the fields &quot;pelagic&quot; and &quot;benthic&quot;.</span>
+<span class="sd">                If this model is coupled with a light model, *concentration* should also</span>
+<span class="sd">                have the fields &quot;light_par&quot; and &quot;light_par0&quot;.</span>
+<span class="sd">            dynamic_inputs (TensorDict): Time-dependent model inputs. Should have the fields &quot;taub&quot;, &quot;temp&quot;, &quot;salt&quot;.</span>
+<span class="sd">                If this model is not coupled to a light model, should also have the corresponding light fields.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            Union[TensorDict, torch.Tensor]: Vector of temporal derivatives</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="n">use_state_light</span> <span class="o">=</span> <span class="kc">False</span>
+
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">concentration</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">):</span>
+            <span class="n">x</span> <span class="o">=</span> <span class="n">concentration</span>
+        <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">concentration</span><span class="p">,</span> <span class="n">TensorDict</span><span class="p">):</span>
+            <span class="n">x</span> <span class="o">=</span> <span class="n">concentration</span><span class="p">[</span><span class="s2">&quot;pelagic&quot;</span><span class="p">]</span>
+            <span class="n">use_state_light</span> <span class="o">=</span> <span class="s2">&quot;light_par&quot;</span> <span class="ow">in</span> <span class="n">concentration</span>
+
+        <span class="n">p1</span> <span class="o">=</span> <span class="n">x</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="p">:]</span>
+        <span class="n">p2</span> <span class="o">=</span> <span class="n">x</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="p">:]</span>
+        <span class="n">p3</span> <span class="o">=</span> <span class="n">x</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="p">:]</span>
+        <span class="n">zo</span> <span class="o">=</span> <span class="n">x</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="p">:]</span>
+        <span class="n">de</span> <span class="o">=</span> <span class="n">x</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="mi">4</span><span class="p">,</span> <span class="p">:]</span>
+        <span class="n">am</span> <span class="o">=</span> <span class="n">x</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="mi">5</span><span class="p">,</span> <span class="p">:]</span>
+        <span class="n">ni</span> <span class="o">=</span> <span class="n">x</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="mi">6</span><span class="p">,</span> <span class="p">:]</span>
+        <span class="n">po</span> <span class="o">=</span> <span class="n">x</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="mi">7</span><span class="p">,</span> <span class="p">:]</span>
+        <span class="n">o2</span> <span class="o">=</span> <span class="n">x</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="mi">8</span><span class="p">,</span> <span class="p">:]</span>
+
+        <span class="k">if</span> <span class="n">use_state_light</span><span class="p">:</span>
+            <span class="n">par0</span> <span class="o">=</span> <span class="n">concentration</span><span class="p">[</span><span class="s2">&quot;light_par0&quot;</span><span class="p">]</span>
+            <span class="n">par</span> <span class="o">=</span> <span class="n">concentration</span><span class="p">[</span><span class="s2">&quot;light_par&quot;</span><span class="p">]</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">par0</span> <span class="o">=</span> <span class="n">dynamic_inputs</span><span class="p">[</span><span class="s2">&quot;par0&quot;</span><span class="p">]</span>
+            <span class="n">par</span> <span class="o">=</span> <span class="n">dynamic_inputs</span><span class="p">[</span><span class="s2">&quot;par&quot;</span><span class="p">]</span>
+
+        <span class="k">if</span> <span class="n">par0</span><span class="o">.</span><span class="n">ndim</span> <span class="o">&lt;</span> <span class="n">par</span><span class="o">.</span><span class="n">ndim</span><span class="p">:</span>
+            <span class="n">par0</span> <span class="o">=</span> <span class="n">par0</span><span class="o">.</span><span class="n">unsqueeze</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+
+        <span class="n">temp</span> <span class="o">=</span> <span class="n">dynamic_inputs</span><span class="p">[</span><span class="s2">&quot;temp&quot;</span><span class="p">]</span>
+
+        <span class="n">iopt</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">clamp_min</span><span class="p">(</span><span class="mf">0.25</span> <span class="o">*</span> <span class="n">par0</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;i_min&quot;</span><span class="p">])</span>
+        <span class="n">par_iopt</span> <span class="o">=</span> <span class="n">par</span> <span class="o">/</span> <span class="n">iopt</span>
+        <span class="n">ppi</span> <span class="o">=</span> <span class="n">par_iopt</span> <span class="o">*</span> <span class="n">torch</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="mf">1.0</span> <span class="o">-</span> <span class="n">par_iopt</span><span class="p">)</span>
+
+        <span class="n">thopnp</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">th</span><span class="p">(</span><span class="n">o2</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;wo&quot;</span><span class="p">],</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">)</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">yy</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;wn&quot;</span><span class="p">],</span> <span class="n">ni</span><span class="p">)</span>
+        <span class="n">thomnp</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">th</span><span class="p">(</span><span class="o">-</span><span class="n">o2</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;wo&quot;</span><span class="p">],</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">)</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">yy</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;wn&quot;</span><span class="p">],</span> <span class="n">ni</span><span class="p">)</span>
+        <span class="n">thomnm</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">th</span><span class="p">(</span><span class="o">-</span><span class="n">o2</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;wo&quot;</span><span class="p">],</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">)</span> <span class="o">*</span> <span class="p">(</span><span class="mf">1.0</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">yy</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;wn&quot;</span><span class="p">],</span> <span class="n">ni</span><span class="p">))</span>
+        <span class="n">thsum</span> <span class="o">=</span> <span class="n">thopnp</span> <span class="o">+</span> <span class="n">thomnp</span> <span class="o">+</span> <span class="n">thomnm</span>
+        <span class="n">thopnp</span> <span class="o">=</span> <span class="n">thopnp</span> <span class="o">/</span> <span class="n">thsum</span>
+        <span class="n">thomnp</span> <span class="o">=</span> <span class="n">thomnp</span> <span class="o">/</span> <span class="n">thsum</span>
+        <span class="n">thomnm</span> <span class="o">=</span> <span class="n">thomnm</span> <span class="o">/</span> <span class="n">thsum</span>
+
+        <span class="n">psum</span> <span class="o">=</span> <span class="n">p1</span> <span class="o">+</span> <span class="n">p2</span> <span class="o">+</span> <span class="n">p3</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;p10&quot;</span><span class="p">]</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;p20&quot;</span><span class="p">]</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;p30&quot;</span><span class="p">]</span>
+
+        <span class="n">llda</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;lda&quot;</span><span class="p">]</span> <span class="o">*</span> <span class="p">(</span><span class="mf">1.0</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;beta_da&quot;</span><span class="p">]</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">yy</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;tda&quot;</span><span class="p">],</span> <span class="n">temp</span><span class="p">))</span>
+        <span class="n">llan</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">th</span><span class="p">(</span><span class="n">o2</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">)</span>
+            <span class="o">*</span> <span class="n">o2</span>
+            <span class="o">/</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;oan&quot;</span><span class="p">]</span> <span class="o">+</span> <span class="n">o2</span><span class="p">)</span>
+            <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;lan&quot;</span><span class="p">]</span>
+            <span class="o">*</span> <span class="n">torch</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;beta_an&quot;</span><span class="p">]</span> <span class="o">*</span> <span class="n">temp</span><span class="p">)</span>
+        <span class="p">)</span>
+
+        <span class="n">lp</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;lpa&quot;</span><span class="p">]</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;lpd&quot;</span><span class="p">]</span>
+
+        <span class="n">r1</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;r1max&quot;</span><span class="p">]</span>
+            <span class="o">*</span> <span class="n">torch</span><span class="o">.</span><span class="n">minimum</span><span class="p">(</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">yy</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;alpha1&quot;</span><span class="p">],</span> <span class="n">am</span> <span class="o">+</span> <span class="n">ni</span><span class="p">),</span>
+                <span class="n">torch</span><span class="o">.</span><span class="n">minimum</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">yy</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;sr&quot;</span><span class="p">]</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;alpha1&quot;</span><span class="p">],</span> <span class="n">po</span><span class="p">),</span> <span class="n">ppi</span><span class="p">),</span>
+            <span class="p">)</span>
+            <span class="o">*</span> <span class="p">(</span><span class="n">p1</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;p10&quot;</span><span class="p">])</span>
+        <span class="p">)</span>
+        <span class="n">r2</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;r2max&quot;</span><span class="p">]</span>
+            <span class="o">*</span> <span class="p">(</span><span class="mf">1.0</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">yy</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;tf&quot;</span><span class="p">],</span> <span class="n">temp</span><span class="p">))</span>
+            <span class="o">*</span> <span class="n">torch</span><span class="o">.</span><span class="n">minimum</span><span class="p">(</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">yy</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;alpha2&quot;</span><span class="p">],</span> <span class="n">am</span> <span class="o">+</span> <span class="n">ni</span><span class="p">),</span>
+                <span class="n">torch</span><span class="o">.</span><span class="n">minimum</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">yy</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;sr&quot;</span><span class="p">]</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;alpha2&quot;</span><span class="p">],</span> <span class="n">po</span><span class="p">),</span> <span class="n">ppi</span><span class="p">),</span>
+            <span class="p">)</span>
+            <span class="o">*</span> <span class="p">(</span><span class="n">p2</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;p20&quot;</span><span class="p">])</span>
+        <span class="p">)</span>
+        <span class="n">r3</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;r3max&quot;</span><span class="p">]</span>
+            <span class="o">*</span> <span class="mf">1.0</span>
+            <span class="o">/</span> <span class="p">(</span><span class="mf">1.0</span> <span class="o">+</span> <span class="n">torch</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;beta_bg&quot;</span><span class="p">]</span> <span class="o">*</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;tbg&quot;</span><span class="p">]</span> <span class="o">-</span> <span class="n">temp</span><span class="p">)))</span>
+            <span class="o">*</span> <span class="n">torch</span><span class="o">.</span><span class="n">minimum</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">yy</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;sr&quot;</span><span class="p">]</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;alpha3&quot;</span><span class="p">],</span> <span class="n">po</span><span class="p">),</span> <span class="n">ppi</span><span class="p">)</span>
+            <span class="o">*</span> <span class="p">(</span><span class="n">p3</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;p30&quot;</span><span class="p">])</span>
+        <span class="p">)</span>
+
+        <span class="n">dp1</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="n">r1</span>
+            <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">fpz</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;iv&quot;</span><span class="p">],</span> <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;g1max&quot;</span><span class="p">],</span> <span class="n">temp</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;topt&quot;</span><span class="p">],</span> <span class="n">psum</span><span class="p">)</span>
+            <span class="o">*</span> <span class="n">p1</span>
+            <span class="o">/</span> <span class="n">psum</span>
+            <span class="o">*</span> <span class="p">(</span><span class="n">zo</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;zo0&quot;</span><span class="p">])</span>
+            <span class="o">-</span> <span class="n">lp</span> <span class="o">*</span> <span class="n">p1</span>
+        <span class="p">)</span>
+        <span class="n">dp2</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="n">r2</span>
+            <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">fpz</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;iv&quot;</span><span class="p">],</span> <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;g2max&quot;</span><span class="p">],</span> <span class="n">temp</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;topt&quot;</span><span class="p">],</span> <span class="n">psum</span><span class="p">)</span>
+            <span class="o">*</span> <span class="n">p2</span>
+            <span class="o">/</span> <span class="n">psum</span>
+            <span class="o">*</span> <span class="p">(</span><span class="n">zo</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;zo0&quot;</span><span class="p">])</span>
+            <span class="o">-</span> <span class="n">lp</span> <span class="o">*</span> <span class="n">p2</span>
+        <span class="p">)</span>
+        <span class="n">dp3</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="n">r3</span>
+            <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">fpz</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;iv&quot;</span><span class="p">],</span> <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;g3max&quot;</span><span class="p">],</span> <span class="n">temp</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;topt&quot;</span><span class="p">],</span> <span class="n">psum</span><span class="p">)</span>
+            <span class="o">*</span> <span class="n">p3</span>
+            <span class="o">/</span> <span class="n">psum</span>
+            <span class="o">*</span> <span class="p">(</span><span class="n">zo</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;zo0&quot;</span><span class="p">])</span>
+            <span class="o">-</span> <span class="n">lp</span> <span class="o">*</span> <span class="n">p3</span>
+        <span class="p">)</span>
+        <span class="n">dzo</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="p">(</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">fpz</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;iv&quot;</span><span class="p">],</span> <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;g1max&quot;</span><span class="p">],</span> <span class="n">temp</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;topt&quot;</span><span class="p">],</span> <span class="n">psum</span><span class="p">)</span> <span class="o">*</span> <span class="n">p1</span>
+                <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">fpz</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;iv&quot;</span><span class="p">],</span> <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;g2max&quot;</span><span class="p">],</span> <span class="n">temp</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;topt&quot;</span><span class="p">],</span> <span class="n">psum</span><span class="p">)</span> <span class="o">*</span> <span class="n">p2</span>
+                <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">fpz</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;iv&quot;</span><span class="p">],</span> <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;g3max&quot;</span><span class="p">],</span> <span class="n">temp</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;topt&quot;</span><span class="p">],</span> <span class="n">psum</span><span class="p">)</span> <span class="o">*</span> <span class="n">p3</span>
+            <span class="p">)</span>
+            <span class="o">*</span> <span class="p">(</span><span class="n">zo</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;zo0&quot;</span><span class="p">])</span>
+            <span class="o">/</span> <span class="n">psum</span>
+            <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;lza&quot;</span><span class="p">]</span> <span class="o">*</span> <span class="n">zo</span> <span class="o">*</span> <span class="p">(</span><span class="n">zo</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;zo0&quot;</span><span class="p">])</span>
+            <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;lzd&quot;</span><span class="p">]</span> <span class="o">*</span> <span class="n">zo</span> <span class="o">*</span> <span class="p">(</span><span class="n">zo</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;zo0&quot;</span><span class="p">])</span>
+        <span class="p">)</span>
+        <span class="n">dde</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;lpd&quot;</span><span class="p">]</span> <span class="o">*</span> <span class="p">(</span><span class="n">p1</span> <span class="o">+</span> <span class="n">p2</span> <span class="o">+</span> <span class="n">p3</span><span class="p">)</span>
+            <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;lzd&quot;</span><span class="p">]</span> <span class="o">*</span> <span class="n">zo</span> <span class="o">*</span> <span class="p">(</span><span class="n">zo</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;zo0&quot;</span><span class="p">])</span>
+            <span class="o">-</span> <span class="n">llda</span> <span class="o">*</span> <span class="n">de</span>
+        <span class="p">)</span>
+        <span class="n">dam</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="n">llda</span> <span class="o">*</span> <span class="n">de</span>
+            <span class="o">-</span> <span class="n">llan</span> <span class="o">*</span> <span class="n">am</span>
+            <span class="o">-</span> <span class="n">am</span> <span class="o">/</span> <span class="p">(</span><span class="n">am</span> <span class="o">+</span> <span class="n">ni</span><span class="p">)</span> <span class="o">*</span> <span class="n">r1</span>
+            <span class="o">-</span> <span class="n">am</span> <span class="o">/</span> <span class="p">(</span><span class="n">am</span> <span class="o">+</span> <span class="n">ni</span><span class="p">)</span> <span class="o">*</span> <span class="n">r2</span>
+            <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;lpa&quot;</span><span class="p">]</span> <span class="o">*</span> <span class="p">(</span><span class="n">p1</span> <span class="o">+</span> <span class="n">p2</span> <span class="o">+</span> <span class="n">p3</span><span class="p">)</span>
+            <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;lza&quot;</span><span class="p">]</span> <span class="o">*</span> <span class="n">zo</span> <span class="o">*</span> <span class="p">(</span><span class="n">zo</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;zo0&quot;</span><span class="p">])</span>
+        <span class="p">)</span>
+        <span class="n">dni</span> <span class="o">=</span> <span class="n">llan</span> <span class="o">*</span> <span class="n">am</span> <span class="o">-</span> <span class="n">ni</span> <span class="o">/</span> <span class="p">(</span><span class="n">am</span> <span class="o">+</span> <span class="n">ni</span><span class="p">)</span> <span class="o">*</span> <span class="n">r1</span> <span class="o">-</span> <span class="n">ni</span> <span class="o">/</span> <span class="p">(</span><span class="n">am</span> <span class="o">+</span> <span class="n">ni</span><span class="p">)</span> <span class="o">*</span> <span class="n">r2</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;s1&quot;</span><span class="p">]</span> <span class="o">*</span> <span class="n">llda</span> <span class="o">*</span> <span class="n">de</span> <span class="o">*</span> <span class="n">thomnp</span>
+        <span class="n">dpo</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;sr&quot;</span><span class="p">]</span> <span class="o">*</span> <span class="p">(</span>
+            <span class="o">-</span><span class="n">r1</span>
+            <span class="o">-</span> <span class="n">r2</span>
+            <span class="o">-</span> <span class="n">r3</span>
+            <span class="o">+</span> <span class="n">llda</span> <span class="o">*</span> <span class="n">de</span>
+            <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;lpa&quot;</span><span class="p">]</span> <span class="o">*</span> <span class="p">(</span><span class="n">p1</span> <span class="o">+</span> <span class="n">p2</span> <span class="o">+</span> <span class="n">p3</span><span class="p">)</span>
+            <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;lza&quot;</span><span class="p">]</span> <span class="o">*</span> <span class="n">zo</span> <span class="o">*</span> <span class="p">(</span><span class="n">zo</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;zo0&quot;</span><span class="p">])</span>
+        <span class="p">)</span>
+        <span class="n">do2</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;s2&quot;</span><span class="p">]</span> <span class="o">*</span> <span class="p">(</span><span class="n">am</span> <span class="o">/</span> <span class="p">(</span><span class="n">am</span> <span class="o">+</span> <span class="n">ni</span><span class="p">)</span> <span class="o">*</span> <span class="p">(</span><span class="n">r1</span> <span class="o">+</span> <span class="n">r2</span><span class="p">)</span> <span class="o">+</span> <span class="n">r3</span><span class="p">)</span>
+            <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;s4&quot;</span><span class="p">]</span> <span class="o">*</span> <span class="p">(</span><span class="n">llan</span> <span class="o">*</span> <span class="n">am</span><span class="p">)</span>
+            <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;s3&quot;</span><span class="p">]</span> <span class="o">*</span> <span class="p">(</span><span class="n">ni</span> <span class="o">/</span> <span class="p">(</span><span class="n">am</span> <span class="o">+</span> <span class="n">ni</span><span class="p">)</span> <span class="o">*</span> <span class="p">(</span><span class="n">r1</span> <span class="o">+</span> <span class="n">r2</span><span class="p">))</span>
+            <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;s2&quot;</span><span class="p">]</span> <span class="o">*</span> <span class="p">(</span><span class="n">thopnp</span> <span class="o">+</span> <span class="n">thomnm</span><span class="p">)</span> <span class="o">*</span> <span class="n">llda</span> <span class="o">*</span> <span class="n">de</span>
+            <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;s2&quot;</span><span class="p">]</span>
+            <span class="o">*</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;lpa&quot;</span><span class="p">]</span> <span class="o">*</span> <span class="p">(</span><span class="n">p1</span> <span class="o">+</span> <span class="n">p2</span> <span class="o">+</span> <span class="n">p3</span><span class="p">)</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;lza&quot;</span><span class="p">]</span> <span class="o">*</span> <span class="n">zo</span> <span class="o">*</span> <span class="p">(</span><span class="n">zo</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;zo0&quot;</span><span class="p">]))</span>
+        <span class="p">)</span>
+
+        <span class="n">dx</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">stack</span><span class="p">([</span><span class="n">dp1</span><span class="p">,</span> <span class="n">dp2</span><span class="p">,</span> <span class="n">dp3</span><span class="p">,</span> <span class="n">dzo</span><span class="p">,</span> <span class="n">dde</span><span class="p">,</span> <span class="n">dam</span><span class="p">,</span> <span class="n">dni</span><span class="p">,</span> <span class="n">dpo</span><span class="p">,</span> <span class="n">do2</span><span class="p">],</span> <span class="n">axis</span><span class="o">=-</span><span class="mi">2</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">concentration</span><span class="p">,</span> <span class="n">TensorDict</span><span class="p">):</span>
+            <span class="k">return</span> <span class="n">TensorDict</span><span class="p">({</span><span class="s2">&quot;pelagic&quot;</span><span class="p">:</span> <span class="n">dx</span><span class="p">},</span> <span class="n">batch_size</span><span class="o">=</span><span class="n">concentration</span><span class="o">.</span><span class="n">batch_size</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">dx</span></div>
+
+
+<div class="viewcode-block" id="GOTMErgomModel.do_bottom">
+<a class="viewcode-back" href="../../../_autosummary/marinade.fabm.gotm_ergom_model.GOTMErgomModel.html#marinade.fabm.gotm_ergom_model.GOTMErgomModel.do_bottom">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">do_bottom</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">concentration</span><span class="p">:</span> <span class="n">TensorDict</span><span class="p">,</span> <span class="n">dynamic_inputs</span><span class="p">:</span> <span class="n">TensorDict</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">TensorDict</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Calculate right-hand side of biological time step ODE as a vector with temporal derivatives for bottom level.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            concentration (TensorDict): The current system state. Should have the fields &quot;pelagic&quot; and &quot;benthic&quot;.</span>
+<span class="sd">                If this model is coupled with a light model, *concentration* should also</span>
+<span class="sd">                have the fields &quot;light_par&quot; and &quot;light_par0&quot;.</span>
+<span class="sd">            dynamic_inputs (TensorDict): Time-dependent model inputs. Should have the fields &quot;taub&quot;, &quot;temp&quot;, &quot;salt&quot;.</span>
+<span class="sd">                If this model is not coupled to a light model, should also have the corresponding light fields.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            TensorDict: Vector of temporal derivatives</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">x</span> <span class="o">=</span> <span class="n">concentration</span><span class="p">[</span><span class="s2">&quot;pelagic&quot;</span><span class="p">]</span>
+
+        <span class="n">de_bottom</span> <span class="o">=</span> <span class="n">x</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="mi">4</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span>
+        <span class="n">ni_bottom</span> <span class="o">=</span> <span class="n">x</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="mi">6</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span>
+        <span class="n">o2_bottom</span> <span class="o">=</span> <span class="n">x</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="mi">8</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span>
+
+        <span class="n">flf</span> <span class="o">=</span> <span class="n">concentration</span><span class="p">[</span><span class="s2">&quot;benthic&quot;</span><span class="p">][</span><span class="o">...</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span>
+
+        <span class="n">temp_bottom</span> <span class="o">=</span> <span class="n">dynamic_inputs</span><span class="p">[</span><span class="s2">&quot;temp&quot;</span><span class="p">][</span><span class="o">...</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span>
+        <span class="n">taub</span> <span class="o">=</span> <span class="n">dynamic_inputs</span><span class="p">[</span><span class="s2">&quot;taub&quot;</span><span class="p">]</span>
+
+        <span class="n">thopnp</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">th</span><span class="p">(</span><span class="n">o2_bottom</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;wo&quot;</span><span class="p">],</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">)</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">yy</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;wn&quot;</span><span class="p">],</span> <span class="n">ni_bottom</span><span class="p">)</span>
+        <span class="n">thomnp</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">th</span><span class="p">(</span><span class="o">-</span><span class="n">o2_bottom</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;wo&quot;</span><span class="p">],</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">)</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">yy</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;wn&quot;</span><span class="p">],</span> <span class="n">ni_bottom</span><span class="p">)</span>
+        <span class="n">thomnm</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">th</span><span class="p">(</span><span class="o">-</span><span class="n">o2_bottom</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;wo&quot;</span><span class="p">],</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">)</span> <span class="o">*</span> <span class="p">(</span>
+            <span class="mf">1.0</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">yy</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;wn&quot;</span><span class="p">],</span> <span class="n">ni_bottom</span><span class="p">)</span>
+        <span class="p">)</span>
+        <span class="n">thsum</span> <span class="o">=</span> <span class="n">thopnp</span> <span class="o">+</span> <span class="n">thomnp</span> <span class="o">+</span> <span class="n">thomnm</span>
+        <span class="n">thopnp</span> <span class="o">=</span> <span class="n">thopnp</span> <span class="o">/</span> <span class="n">thsum</span>
+        <span class="n">thomnp</span> <span class="o">=</span> <span class="n">thomnp</span> <span class="o">/</span> <span class="n">thsum</span>
+        <span class="n">thomnm</span> <span class="o">=</span> <span class="n">thomnm</span> <span class="o">/</span> <span class="n">thsum</span>
+
+        <span class="n">llsa</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;lsa&quot;</span><span class="p">]</span>
+            <span class="o">*</span> <span class="n">torch</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;bsa&quot;</span><span class="p">]</span> <span class="o">*</span> <span class="n">temp_bottom</span><span class="p">)</span>
+            <span class="o">*</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">th</span><span class="p">(</span><span class="n">o2_bottom</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;wo&quot;</span><span class="p">],</span> <span class="bp">self</span><span class="o">.</span><span class="n">dot2</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">))</span>
+        <span class="p">)</span>
+
+        <span class="c1"># Sedimentation dependent on bottom stress</span>
+        <span class="n">llds</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">clamp_min</span><span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;lds&quot;</span><span class="p">]</span> <span class="o">*</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;tau_crit&quot;</span><span class="p">]</span> <span class="o">-</span> <span class="n">taub</span><span class="p">)</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;tau_crit&quot;</span><span class="p">],</span> <span class="mf">0.0</span>
+        <span class="p">)</span>
+
+        <span class="c1"># Resuspension dependent on bottom stress</span>
+        <span class="n">llsd</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">clamp_min</span><span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;lsd&quot;</span><span class="p">]</span> <span class="o">*</span> <span class="p">(</span><span class="n">taub</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;tau_crit&quot;</span><span class="p">])</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;tau_crit&quot;</span><span class="p">],</span> <span class="mf">0.0</span>
+        <span class="p">)</span>
+
+        <span class="n">dfl</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="n">llds</span> <span class="o">*</span> <span class="n">de_bottom</span>
+            <span class="o">-</span> <span class="n">llsd</span> <span class="o">*</span> <span class="n">flf</span>
+            <span class="o">-</span> <span class="n">llsa</span> <span class="o">*</span> <span class="n">flf</span>
+            <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">th</span><span class="p">(</span><span class="n">o2_bottom</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;wo&quot;</span><span class="p">],</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">)</span> <span class="o">*</span> <span class="n">llsa</span> <span class="o">*</span> <span class="n">flf</span>
+        <span class="p">)</span>
+
+        <span class="n">fl_de</span> <span class="o">=</span> <span class="o">-</span><span class="n">llds</span> <span class="o">*</span> <span class="n">de_bottom</span> <span class="o">+</span> <span class="n">llsd</span> <span class="o">*</span> <span class="n">flf</span>
+        <span class="n">fl_am</span> <span class="o">=</span> <span class="n">llsa</span> <span class="o">*</span> <span class="n">flf</span>
+        <span class="n">fl_ni</span> <span class="o">=</span> <span class="o">-</span><span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;s1&quot;</span><span class="p">]</span> <span class="o">*</span> <span class="n">thomnp</span> <span class="o">*</span> <span class="n">llsa</span> <span class="o">*</span> <span class="n">flf</span>
+        <span class="n">fl_po</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;sr&quot;</span><span class="p">]</span>
+            <span class="o">*</span> <span class="p">(</span>
+                <span class="mf">1.0</span>
+                <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;ph1&quot;</span><span class="p">]</span>
+                <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">th</span><span class="p">(</span><span class="n">o2_bottom</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;wo&quot;</span><span class="p">],</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">)</span>
+                <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">yy</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;ph2&quot;</span><span class="p">],</span> <span class="n">o2_bottom</span><span class="p">)</span>
+            <span class="p">)</span>
+            <span class="o">*</span> <span class="n">llsa</span>
+            <span class="o">*</span> <span class="n">flf</span>
+        <span class="p">)</span>
+        <span class="n">fl_o2</span> <span class="o">=</span> <span class="o">-</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;s4&quot;</span><span class="p">]</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;s2&quot;</span><span class="p">]</span> <span class="o">*</span> <span class="p">(</span><span class="n">thopnp</span> <span class="o">+</span> <span class="n">thomnm</span><span class="p">))</span> <span class="o">*</span> <span class="n">llsa</span> <span class="o">*</span> <span class="n">flf</span>
+        <span class="n">fl_zero</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">full_like</span><span class="p">(</span><span class="n">fl_o2</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">)</span>
+
+        <span class="n">fl_x</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">stack</span><span class="p">([</span><span class="n">fl_zero</span><span class="p">,</span> <span class="n">fl_zero</span><span class="p">,</span> <span class="n">fl_zero</span><span class="p">,</span> <span class="n">fl_zero</span><span class="p">,</span> <span class="n">fl_de</span><span class="p">,</span> <span class="n">fl_am</span><span class="p">,</span> <span class="n">fl_ni</span><span class="p">,</span> <span class="n">fl_po</span><span class="p">,</span> <span class="n">fl_o2</span><span class="p">],</span> <span class="n">axis</span><span class="o">=-</span><span class="mi">1</span><span class="p">)</span><span class="o">.</span><span class="n">unsqueeze</span><span class="p">(</span>
+            <span class="o">-</span><span class="mi">1</span>
+        <span class="p">)</span>
+
+        <span class="n">d_benthic</span> <span class="o">=</span> <span class="n">dfl</span><span class="o">.</span><span class="n">unsqueeze</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">TensorDict</span><span class="p">({</span><span class="s2">&quot;pelagic&quot;</span><span class="p">:</span> <span class="n">fl_x</span><span class="p">,</span> <span class="s2">&quot;benthic&quot;</span><span class="p">:</span> <span class="n">d_benthic</span><span class="p">},</span> <span class="n">batch_size</span><span class="o">=</span><span class="n">concentration</span><span class="o">.</span><span class="n">batch_size</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="GOTMErgomModel.do_surface">
+<a class="viewcode-back" href="../../../_autosummary/marinade.fabm.gotm_ergom_model.GOTMErgomModel.html#marinade.fabm.gotm_ergom_model.GOTMErgomModel.do_surface">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">do_surface</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">concentration</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">TensorDict</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">],</span> <span class="n">dynamic_inputs</span><span class="p">:</span> <span class="n">TensorDict</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Union</span><span class="p">[</span><span class="n">TensorDict</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Calculate right-hand side of biological time step ODE as a vector with temporal derivatives at surface level.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            concentration (Union[TensorDict, torch.Tensor]): The current system state.</span>
+<span class="sd">                Should have the fields &quot;pelagic&quot; and &quot;benthic&quot;.</span>
+<span class="sd">                If this model is coupled with a light model, *concentration* should also</span>
+<span class="sd">                have the fields &quot;light_par&quot; and &quot;light_par0&quot;.</span>
+<span class="sd">            dynamic_inputs (TensorDict): Time-dependent model inputs. Should have the fields &quot;taub&quot;, &quot;temp&quot;, &quot;salt&quot;.</span>
+<span class="sd">                If this model is not coupled to a light model, should also have the corresponding light fields.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            Union[TensorDict, torch.Tensor]: Vector of temporal derivatives</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">concentration</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">):</span>
+            <span class="n">x</span> <span class="o">=</span> <span class="n">concentration</span>
+        <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">concentration</span><span class="p">,</span> <span class="n">TensorDict</span><span class="p">):</span>
+            <span class="n">x</span> <span class="o">=</span> <span class="n">concentration</span><span class="p">[</span><span class="s2">&quot;pelagic&quot;</span><span class="p">]</span>
+
+        <span class="n">temp_surface</span> <span class="o">=</span> <span class="n">dynamic_inputs</span><span class="p">[</span><span class="s2">&quot;temp&quot;</span><span class="p">][</span><span class="o">...</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+        <span class="n">salt_surface</span> <span class="o">=</span> <span class="n">dynamic_inputs</span><span class="p">[</span><span class="s2">&quot;salt&quot;</span><span class="p">][</span><span class="o">...</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+        <span class="n">o2_surface</span> <span class="o">=</span> <span class="n">x</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="mi">8</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+        <span class="n">wind</span> <span class="o">=</span> <span class="n">dynamic_inputs</span><span class="p">[</span><span class="s2">&quot;wind&quot;</span><span class="p">]</span>
+
+        <span class="n">sc</span> <span class="o">=</span> <span class="mf">1450.0</span> <span class="o">+</span> <span class="p">(</span><span class="mf">1.1</span> <span class="o">*</span> <span class="n">temp_surface</span> <span class="o">-</span> <span class="mf">71.0</span><span class="p">)</span> <span class="o">*</span> <span class="n">temp_surface</span>
+        <span class="n">p_vel</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">mask_func</span><span class="p">(</span>
+            <span class="n">wind</span> <span class="o">-</span> <span class="mf">13.0</span><span class="p">,</span>
+            <span class="mf">5.9</span> <span class="o">*</span> <span class="p">(</span><span class="mf">5.9</span> <span class="o">*</span> <span class="n">wind</span> <span class="o">-</span> <span class="mf">49.3</span><span class="p">)</span> <span class="o">/</span> <span class="n">torch</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">sc</span><span class="p">),</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">mask_func</span><span class="p">(</span><span class="mf">3.6</span> <span class="o">-</span> <span class="n">wind</span><span class="p">,</span> <span class="mf">1.003</span> <span class="o">*</span> <span class="n">wind</span> <span class="o">/</span> <span class="n">sc</span><span class="o">**</span><span class="mf">0.66</span><span class="p">,</span> <span class="mf">5.9</span> <span class="o">*</span> <span class="p">(</span><span class="mf">2.85</span> <span class="o">*</span> <span class="n">wind</span> <span class="o">-</span> <span class="mf">9.65</span><span class="p">)</span> <span class="o">/</span> <span class="n">torch</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">sc</span><span class="p">)),</span>
+        <span class="p">)</span>
+        <span class="n">p_vel</span> <span class="o">=</span> <span class="n">p_vel</span><span class="o">.</span><span class="n">clamp_min</span><span class="p">(</span><span class="mf">0.05</span><span class="p">)</span> <span class="o">/</span> <span class="mf">86400.0</span>
+
+        <span class="n">fl_o2</span> <span class="o">=</span> <span class="n">p_vel</span> <span class="o">*</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">osat_weiss</span><span class="p">(</span><span class="n">temp_surface</span><span class="p">,</span> <span class="n">salt_surface</span><span class="p">)</span> <span class="o">-</span> <span class="n">o2_surface</span><span class="p">)</span>
+
+        <span class="n">fl_ni</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">full_like</span><span class="p">(</span><span class="n">fl_o2</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;sfl_ni&quot;</span><span class="p">])</span>
+        <span class="n">fl_am</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">full_like</span><span class="p">(</span><span class="n">fl_o2</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;sfl_am&quot;</span><span class="p">])</span>
+        <span class="n">fl_po</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">full_like</span><span class="p">(</span><span class="n">fl_o2</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;sfl_po&quot;</span><span class="p">])</span>
+        <span class="n">fl_zero</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">full_like</span><span class="p">(</span><span class="n">fl_o2</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">)</span>
+
+        <span class="n">fl_x</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">stack</span><span class="p">(</span>
+            <span class="p">[</span><span class="n">fl_zero</span><span class="p">,</span> <span class="n">fl_zero</span><span class="p">,</span> <span class="n">fl_zero</span><span class="p">,</span> <span class="n">fl_zero</span><span class="p">,</span> <span class="n">fl_zero</span><span class="p">,</span> <span class="n">fl_am</span><span class="p">,</span> <span class="n">fl_ni</span><span class="p">,</span> <span class="n">fl_po</span><span class="p">,</span> <span class="n">fl_o2</span><span class="p">],</span> <span class="n">axis</span><span class="o">=-</span><span class="mi">1</span>
+        <span class="p">)</span><span class="o">.</span><span class="n">unsqueeze</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">concentration</span><span class="p">,</span> <span class="n">TensorDict</span><span class="p">):</span>
+            <span class="k">return</span> <span class="n">TensorDict</span><span class="p">({</span><span class="s2">&quot;pelagic&quot;</span><span class="p">:</span> <span class="n">fl_x</span><span class="p">},</span> <span class="n">batch_size</span><span class="o">=</span><span class="n">concentration</span><span class="o">.</span><span class="n">batch_size</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">fl_x</span></div>
+
+
+<div class="viewcode-block" id="GOTMErgomModel.do_ppdd">
+<a class="viewcode-back" href="../../../_autosummary/marinade.fabm.gotm_ergom_model.GOTMErgomModel.html#marinade.fabm.gotm_ergom_model.GOTMErgomModel.do_ppdd">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">do_ppdd</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Calculate source/sink terms of biological variables as production and destruction matrices.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            NotImplementedError: This method still has to be implemented.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">()</span></div>
+
+
+    <span class="c1"># For the BioModel.right_hand_side_rhs method, we want to hide the do_bottom method in case self.fluff is False</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__getattribute__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Hide do_bottom if fluff is False.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">name</span> <span class="o">==</span> <span class="s2">&quot;do_bottom&quot;</span> <span class="ow">and</span> <span class="ow">not</span> <span class="nb">object</span><span class="o">.</span><span class="fm">__getattribute__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;fluff&quot;</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">AttributeError</span><span class="p">(</span><span class="s2">&quot;hidden&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="nb">object</span><span class="o">.</span><span class="fm">__getattribute__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__dir__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Hide do_bottom from dir() if fluff is False.&quot;&quot;&quot;</span>
+        <span class="n">d</span> <span class="o">=</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__dir__</span><span class="p">()</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">fluff</span> <span class="ow">and</span> <span class="s2">&quot;do_bottom&quot;</span> <span class="ow">in</span> <span class="n">d</span><span class="p">:</span>
+            <span class="n">d</span><span class="o">.</span><span class="n">remove</span><span class="p">(</span><span class="s2">&quot;do_bottom&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">d</span></div>
+
+</pre></div>
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../../../index.html">
+              <img class="logo" src="../../../_static/m-dml_logo_banner_cropped.png" alt="Logo of MARINADE"/>
+            </a></p>
+<h1 class="logo"><a href="../../../index.html">MARINADE</a></h1>
+
+
+
+
+
+
+
+
+
+<search id="searchbox" style="display: none" role="search">
+    <div class="searchformwrapper">
+    <form class="search" action="../../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Search"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script><h3>Navigation</h3>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../index.html">Documentation of MARINADE</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../backward.html">Tridiagonal Backward Pass</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../backward.html#tridiagonal-forward-pass">Tridiagonal Forward Pass</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../_autosummary/marinade.html">marinade</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../../../index.html">Documentation overview</a><ul>
+  <li><a href="../../index.html">Module code</a><ul>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &#169;2026, m-dml team.
+      
+      |
+      Powered by <a href="https://www.sphinx-doc.org/">Sphinx 9.2.0</a>
+      &amp; <a href="https://alabaster.readthedocs.io">Alabaster 1.0.0</a>
+      
+    </div>
+
+    
+
+    
+  </body>
+</html>

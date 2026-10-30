@@ -1,0 +1,36 @@
+﻿marinade
+========
+
+
+.. automodule:: marinade
+
+    
+    
+    .. rubric:: Modules
+
+    .. autosummary::
+       :toctree:
+       :template: custom-module.rst
+       :recursive:
+    
+       fabm
+       gotm
+       util
+    
+    
+
+   
+   
+   
+
+   
+   
+   
+
+   
+   
+   
+
+   
+   
+   

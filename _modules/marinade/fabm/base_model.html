@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../../../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>marinade.fabm.base_model &#8212; MARINADE 1.0.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=5ecbeea2" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/basic.css?v=b08954a9" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/alabaster.css?v=27fed22d" />
+    <script src="../../../_static/documentation_options.js?v=8d563738"></script>
+    <script src="../../../_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <link rel="icon" href="../../../_static/m-dml_logo_dark.png"/>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" />
+   
+  <link rel="stylesheet" href="../../../_static/custom.css" type="text/css" />
+  
+
+  
+  
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <h1>Source code for marinade.fabm.base_model</h1><div class="highlight"><pre>
+<span></span><span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Union</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">tensordict</span><span class="w"> </span><span class="kn">import</span> <span class="n">TensorDict</span>
+
+
+<div class="viewcode-block" id="BaseModel">
+<a class="viewcode-back" href="../../../_autosummary/marinade.fabm.base_model.BaseModel.html#marinade.fabm.base_model.BaseModel">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">BaseModel</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Base class for biosystem models.</span>
+
+<span class="sd">    Subclasses should be defined for specific models.</span>
+
+<span class="sd">    Instances of this base model will return zero sinking velocity and the forward step will not change the tracer</span>
+<span class="sd">    concentrations.</span>
+
+<span class="sd">    If created by the constructor method, this model uses the default parameters. A model with custom parameters can</span>
+<span class="sd">    be created from a .yaml file with *model.create_model_from_yaml_file*.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        model_name (str, optional): The name of the model. Defaults to &quot;&quot;.</span>
+<span class="sd">        repair_state (bool, optional): Whether to repair invalid states. Defaults to False.</span>
+<span class="sd">        repair_minfunc (callable, optional): Method for the lower bound</span>
+<span class="sd">            of allowed values. Defaults to torch.clamp_min.</span>
+<span class="sd">        repair_maxfunc (callable, optional): Method for the upper bound</span>
+<span class="sd">            of allowed values. Defaults to torch.clamp_max.</span>
+<span class="sd">        device (str, optional): The device where the tensors of the model should be stored. Defaults to &quot;cpu&quot;.</span>
+<span class="sd">        dtype (torch.dtype, optional): The default data type of the model. Defaults to torch.float64.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">model_name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span><span class="p">,</span>
+        <span class="n">repair_state</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+        <span class="n">repair_minfunc</span><span class="p">:</span> <span class="nb">callable</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">clamp_min</span><span class="p">,</span>
+        <span class="n">repair_maxfunc</span><span class="p">:</span> <span class="nb">callable</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">clamp_max</span><span class="p">,</span>
+        <span class="n">mask_func</span><span class="p">:</span> <span class="nb">callable</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">x</span><span class="p">,</span> <span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">x</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">,</span> <span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">),</span>
+        <span class="n">device</span><span class="o">=</span><span class="s2">&quot;cpu&quot;</span><span class="p">,</span>
+        <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">float64</span><span class="p">,</span>
+        <span class="o">*</span><span class="n">args</span><span class="p">,</span>
+        <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
+    <span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">model_name</span> <span class="o">=</span> <span class="n">model_name</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">tracer_names</span> <span class="o">=</span> <span class="p">[]</span>  <span class="c1"># the names of the tracers, e.g. &quot;sed_c&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">benthic_tracer_names</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">dependencies</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">output_fields</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">repair_state</span> <span class="o">=</span> <span class="n">repair_state</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">repair_minfunc</span> <span class="o">=</span> <span class="n">repair_minfunc</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">repair_maxfunc</span> <span class="o">=</span> <span class="n">repair_maxfunc</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span> <span class="o">=</span> <span class="n">TensorDict</span><span class="p">({},</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">mask_func</span> <span class="o">=</span> <span class="n">mask_func</span>
+
+<div class="viewcode-block" id="BaseModel.create_model_from_yaml_file">
+<a class="viewcode-back" href="../../../_autosummary/marinade.fabm.base_model.BaseModel.html#marinade.fabm.base_model.BaseModel.create_model_from_yaml_file">[docs]</a>
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">create_model_from_yaml_file</span><span class="p">(</span>
+        <span class="bp">cls</span><span class="p">,</span>
+        <span class="n">path_fabm</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">path_gotm</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">device</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;cpu&quot;</span><span class="p">,</span>
+        <span class="n">dtype</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">dtype</span><span class="p">]</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">float64</span><span class="p">,</span>
+        <span class="o">*</span><span class="n">args</span><span class="p">,</span>
+        <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
+    <span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Creates a *base_model* instance from .yaml configuration files. Should generally be used instead of the</span>
+<span class="sd">        constructor. Designed to be compatible with the configuration files of GOTM.</span>
+
+<span class="sd">        Should be overwritten by subclasses.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            path_fabm (str): Path to the FABM .yaml configuration file</span>
+<span class="sd">            path_gotm (str): Path to the GOTM .yaml configuration file</span>
+<span class="sd">            device (str, optional): Torch device. Defaults to &quot;cpu&quot;.</span>
+<span class="sd">            dtype (str or torch.dtype, optional): Torch data type. Defaults to torch.float64.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            BaseModel: The generated model</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span></div>
+
+
+<div class="viewcode-block" id="BaseModel.get_vertical_movement">
+<a class="viewcode-back" href="../../../_autosummary/marinade.fabm.base_model.BaseModel.html#marinade.fabm.base_model.BaseModel.get_vertical_movement">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_vertical_movement</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">concentration</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">TensorDict</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">],</span> <span class="n">dynamic_inputs</span><span class="p">:</span> <span class="n">TensorDict</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Compute velocity for vertical movement *through* the fluid for biological state variables.</span>
+
+<span class="sd">        Note that this method returns a zero sinking velocity. It should generally be overwritten</span>
+<span class="sd">        by subclasses, in case they feature a non-zero sinking velocity.</span>
+
+<span class="sd">        For more complex models, the result might depend on the momentary state.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            concentration (Union[TensorDict, torch.Tensor]): Momentary concentrations of the model tracers.</span>
+<span class="sd">                [batch, tracer, nlev]</span>
+<span class="sd">            dynamic_inputs (TensorDict): Dict of additional inputs.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            torch.Tensor: Vertical movement of the model tracers.</span>
+<span class="sd">                [batch, tracer or 1, nlev] or [batch, tracer or 1, nlev + 1]</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">concentration</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">):</span>
+            <span class="n">x</span> <span class="o">=</span> <span class="n">concentration</span>
+        <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">concentration</span><span class="p">,</span> <span class="n">TensorDict</span><span class="p">):</span>
+            <span class="n">x</span> <span class="o">=</span> <span class="n">concentration</span><span class="p">[</span><span class="s2">&quot;pelagic&quot;</span><span class="p">]</span>
+        <span class="n">shape</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">x</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span>
+        <span class="n">shape</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span> <span class="o">=</span> <span class="n">shape</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span> <span class="o">+</span> <span class="mi">1</span>
+        <span class="k">return</span> <span class="n">torch</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">shape</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">x</span><span class="o">.</span><span class="n">device</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">x</span><span class="o">.</span><span class="n">dtype</span><span class="p">)</span>  <span class="c1"># no sinking by default</span></div>
+
+
+<div class="viewcode-block" id="BaseModel.do_repair_state">
+<a class="viewcode-back" href="../../../_autosummary/marinade.fabm.base_model.BaseModel.html#marinade.fabm.base_model.BaseModel.do_repair_state">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">do_repair_state</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">concentration</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">TensorDict</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">]):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Repair function for the states. In many models, there are maximal or minimal allowed values for certain</span>
+<span class="sd">        tracers. In particular, there might be a positivity constraint.</span>
+
+<span class="sd">        Note that this base implementation returns the current state without modifications.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            concentration (Union[TensorDict, torch.Tensor]): Current state. Can be a tensor or TensorDict</span>
+<span class="sd">                with key &#39;pelagic&#39; for the submerged tracers.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            Union[TensorDict, torch.Tensor]: The repaired state</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="n">concentration</span></div>
+
+
+<div class="viewcode-block" id="BaseModel.forward">
+<a class="viewcode-back" href="../../../_autosummary/marinade.fabm.base_model.BaseModel.html#marinade.fabm.base_model.BaseModel.forward">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">forward</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">concentration</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">TensorDict</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">],</span> <span class="n">dt</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">dynamic_inputs</span><span class="p">:</span> <span class="n">TensorDict</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Union</span><span class="p">[</span><span class="n">TensorDict</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Compute the biogeochemical model time step based on the momentary state. Might require additional forcing</span>
+<span class="sd">        inputs, e.g. incoming radiation, depending on the model.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            concentration (Union[TensorDict, torch.Tensor]): The current tracer concentrations</span>
+<span class="sd">            dt (float): The time step of the simulation</span>
+<span class="sd">            dynamic_inputs (TensorDict): Dict of additional inputs</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            (Union[TensorDict, torch.Tensor]): The new tracer concentration field</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="n">concentration</span></div>
+
+
+    <span class="fm">__call__</span> <span class="o">=</span> <span class="n">forward</span>
+
+<div class="viewcode-block" id="BaseModel.update_parameters">
+<a class="viewcode-back" href="../../../_autosummary/marinade.fabm.base_model.BaseModel.html#marinade.fabm.base_model.BaseModel.update_parameters">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">update_parameters</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">parameters</span><span class="p">:</span> <span class="n">TensorDict</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Update the parameters of the model.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            parameters (TensorDict): The model parameters to be updated</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">parameters</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="BaseModel.get_parameters">
+<a class="viewcode-back" href="../../../_autosummary/marinade.fabm.base_model.BaseModel.html#marinade.fabm.base_model.BaseModel.get_parameters">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_parameters</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Retrieve the parameters of the model.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            (TensorDict): The model parameters</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span></div>
+</div>
+
+
+
+<span class="n">NPZDModel</span> <span class="o">=</span> <span class="n">BaseModel</span>  <span class="c1"># legacy name</span>
+</pre></div>
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../../../index.html">
+              <img class="logo" src="../../../_static/m-dml_logo_banner_cropped.png" alt="Logo of MARINADE"/>
+            </a></p>
+<h1 class="logo"><a href="../../../index.html">MARINADE</a></h1>
+
+
+
+
+
+
+
+
+
+<search id="searchbox" style="display: none" role="search">
+    <div class="searchformwrapper">
+    <form class="search" action="../../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Search"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script><h3>Navigation</h3>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../index.html">Documentation of MARINADE</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../backward.html">Tridiagonal Backward Pass</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../backward.html#tridiagonal-forward-pass">Tridiagonal Forward Pass</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../_autosummary/marinade.html">marinade</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../../../index.html">Documentation overview</a><ul>
+  <li><a href="../../index.html">Module code</a><ul>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &#169;2026, m-dml team.
+      
+      |
+      Powered by <a href="https://www.sphinx-doc.org/">Sphinx 9.2.0</a>
+      &amp; <a href="https://alabaster.readthedocs.io">Alabaster 1.0.0</a>
+      
+    </div>
+
+    
+
+    
+  </body>
+</html>

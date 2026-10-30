@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../../../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>marinade.util.ode_solvers &#8212; MARINADE 1.0.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=5ecbeea2" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/basic.css?v=b08954a9" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/alabaster.css?v=27fed22d" />
+    <script src="../../../_static/documentation_options.js?v=8d563738"></script>
+    <script src="../../../_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <link rel="icon" href="../../../_static/m-dml_logo_dark.png"/>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" />
+   
+  <link rel="stylesheet" href="../../../_static/custom.css" type="text/css" />
+  
+
+  
+  
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <h1>Source code for marinade.util.ode_solvers</h1><div class="highlight"><pre>
+<span></span><span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Callable</span><span class="p">,</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Union</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">tensordict</span><span class="w"> </span><span class="kn">import</span> <span class="n">TensorDict</span>
+
+
+<div class="viewcode-block" id="ode_solver">
+<a class="viewcode-back" href="../../../_autosummary/marinade.util.ode_solvers.ode_solver.html#marinade.util.ode_solvers.ode_solver">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">ode_solver</span><span class="p">(</span>
+    <span class="n">ode_method</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="n">concentration</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">TensorDict</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">],</span>
+    <span class="n">dt</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">],</span>
+    <span class="n">dynamic_inputs</span><span class="p">:</span> <span class="n">TensorDict</span><span class="p">,</span>
+    <span class="n">rhs_function</span><span class="p">:</span> <span class="n">Callable</span><span class="p">,</span>
+    <span class="n">ppdd_function</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Callable</span><span class="p">],</span>  <span class="c1"># noqa: VULTURE</span>
+    <span class="o">*</span><span class="n">args</span><span class="p">,</span>
+    <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
+<span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Solve an ODE defined by the function arguments. Based on GOTM&#39;s *util/ode_solvers_template*.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        ode_method (str): The numerical method (&quot;FE&quot;: Forward Euler, &quot;RK2&quot;: 2nd order Runge-Kutta,</span>
+<span class="sd">            &quot;RK4&quot;: 4th order Runge-Kutta)</span>
+<span class="sd">        concentration (Union[TensorDict, torch.Tensor]): The current state</span>
+<span class="sd">        dt (Union[float, torch.Tensor]): The time step</span>
+<span class="sd">        dynamic_inputs (TensorDict): Inputs to the model, e.g. temperature, salinity, ...</span>
+<span class="sd">        rhs_function (Callable): Right-hand side function</span>
+<span class="sd">        ppdd_function (Optional[Callable]): Production and destruction matrices used for Patankar schemes</span>
+<span class="sd">            (not yet implemented)</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        NotImplementedError: The specified ODE solver has not been implemented yet</span>
+<span class="sd">        ValueError: The specified ODE solver is invalid</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        (TensorDict or torch.Tensor): The new state</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">ode_method</span> <span class="o">==</span> <span class="s2">&quot;FE&quot;</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">euler_forward</span><span class="p">(</span><span class="n">concentration</span><span class="p">,</span> <span class="n">dt</span><span class="p">,</span> <span class="n">dynamic_inputs</span><span class="p">,</span> <span class="n">rhs_function</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="n">ode_method</span> <span class="o">==</span> <span class="s2">&quot;RK2&quot;</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">runge_kutta_2</span><span class="p">(</span><span class="n">concentration</span><span class="p">,</span> <span class="n">dt</span><span class="p">,</span> <span class="n">dynamic_inputs</span><span class="p">,</span> <span class="n">rhs_function</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="n">ode_method</span> <span class="o">==</span> <span class="s2">&quot;RK4&quot;</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">runge_kutta_4</span><span class="p">(</span><span class="n">concentration</span><span class="p">,</span> <span class="n">dt</span><span class="p">,</span> <span class="n">dynamic_inputs</span><span class="p">,</span> <span class="n">rhs_function</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="p">(</span>
+        <span class="n">ode_method</span> <span class="o">==</span> <span class="s2">&quot;Patankar1&quot;</span>
+        <span class="ow">or</span> <span class="n">ode_method</span> <span class="o">==</span> <span class="s2">&quot;Patankar2&quot;</span>
+        <span class="ow">or</span> <span class="n">ode_method</span> <span class="o">==</span> <span class="s2">&quot;Patankar4&quot;</span>
+        <span class="ow">or</span> <span class="n">ode_method</span> <span class="o">==</span> <span class="s2">&quot;MP1&quot;</span>
+        <span class="ow">or</span> <span class="n">ode_method</span> <span class="o">==</span> <span class="s2">&quot;MP2&quot;</span>
+        <span class="ow">or</span> <span class="n">ode_method</span> <span class="o">==</span> <span class="s2">&quot;MP4&quot;</span>
+        <span class="ow">or</span> <span class="n">ode_method</span> <span class="o">==</span> <span class="s2">&quot;EMP1&quot;</span>
+        <span class="ow">or</span> <span class="n">ode_method</span> <span class="o">==</span> <span class="s2">&quot;EMP2&quot;</span>
+        <span class="ow">or</span> <span class="n">ode_method</span> <span class="o">==</span> <span class="s2">&quot;EMP4&quot;</span>
+    <span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;The ODE solver </span><span class="si">{</span><span class="n">ode_method</span><span class="si">}</span><span class="s2"> has not been implemented yet&quot;</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">ode_method</span><span class="si">}</span><span class="s2"> is not a valid scheme&quot;</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="euler_forward">
+<a class="viewcode-back" href="../../../_autosummary/marinade.util.ode_solvers.euler_forward.html#marinade.util.ode_solvers.euler_forward">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">euler_forward</span><span class="p">(</span>
+    <span class="n">concentration</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">TensorDict</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">],</span>
+    <span class="n">dt</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">],</span>
+    <span class="n">dynamic_inputs</span><span class="p">:</span> <span class="n">TensorDict</span><span class="p">,</span>
+    <span class="n">rhs_function</span><span class="p">:</span> <span class="n">Callable</span><span class="p">,</span>
+    <span class="o">*</span><span class="n">args</span><span class="p">,</span>
+    <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
+<span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Simple Euler forward scheme (first order) according to:</span>
+
+<span class="sd">    .. math::</span>
+<span class="sd">        c^{n+1} = c^n + \\Delta t f(c^n)</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        concentration (Union[TensorDict, torch.Tensor]): The current state</span>
+<span class="sd">        dt (Union[float, torch.Tensor]): The time step</span>
+<span class="sd">        dynamic_inputs (TensorDict): Inputs to the model, e.g. temperature, salinity, ...</span>
+<span class="sd">        rhs_function (Callable): Right-hand side function :math:`f`</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        (TensorDict or torch.Tensor): The new state</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">rhs</span> <span class="o">=</span> <span class="n">rhs_function</span><span class="p">(</span><span class="n">concentration</span><span class="p">,</span> <span class="n">dynamic_inputs</span><span class="p">,</span> <span class="n">first</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+
+    <span class="n">concentration</span> <span class="o">=</span> <span class="n">partial_add_tensordict</span><span class="p">(</span><span class="n">concentration</span><span class="p">,</span> <span class="n">dt</span> <span class="o">*</span> <span class="n">rhs</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">concentration</span></div>
+
+
+
+<div class="viewcode-block" id="runge_kutta_2">
+<a class="viewcode-back" href="../../../_autosummary/marinade.util.ode_solvers.runge_kutta_2.html#marinade.util.ode_solvers.runge_kutta_2">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">runge_kutta_2</span><span class="p">(</span>
+    <span class="n">concentration</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">TensorDict</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">],</span>
+    <span class="n">dt</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">],</span>
+    <span class="n">dynamic_inputs</span><span class="p">:</span> <span class="n">TensorDict</span><span class="p">,</span>
+    <span class="n">rhs_function</span><span class="p">:</span> <span class="n">Callable</span><span class="p">,</span>
+    <span class="o">*</span><span class="n">args</span><span class="p">,</span>
+    <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
+<span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Second-order explicit Runge-Kutta scheme, midpoint method according to:</span>
+
+<span class="sd">    .. math::</span>
+<span class="sd">        c^{n+1} = c^n + \\Delta t f(c^n + \\frac{\\Delta t}{2}f(c^n))</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        concentration (Union[TensorDict, torch.Tensor]): The current state</span>
+<span class="sd">        dt (Union[float, torch.Tensor]): The time step</span>
+<span class="sd">        dynamic_inputs (TensorDict): Inputs to the model, e.g. temperature, salinity, ...</span>
+<span class="sd">        rhs_function (Callable): Right-hand side function :math:`f`</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        (TensorDict or torch.Tensor): The new state</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># Midpoint method</span>
+
+    <span class="n">rhs</span> <span class="o">=</span> <span class="n">rhs_function</span><span class="p">(</span><span class="n">concentration</span><span class="p">,</span> <span class="n">dynamic_inputs</span><span class="p">,</span> <span class="n">first</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+
+    <span class="n">concentration_1</span> <span class="o">=</span> <span class="n">partial_add_tensordict</span><span class="p">(</span><span class="n">concentration</span><span class="p">,</span> <span class="n">dt</span> <span class="o">/</span> <span class="mf">2.0</span> <span class="o">*</span> <span class="n">rhs</span><span class="p">)</span>
+
+    <span class="n">rhs</span> <span class="o">=</span> <span class="n">rhs_function</span><span class="p">(</span><span class="n">concentration_1</span><span class="p">,</span> <span class="n">dynamic_inputs</span><span class="p">,</span> <span class="n">first</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+
+    <span class="n">concentration</span> <span class="o">=</span> <span class="n">partial_add_tensordict</span><span class="p">(</span><span class="n">concentration</span><span class="p">,</span> <span class="n">dt</span> <span class="o">*</span> <span class="n">rhs</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">concentration</span></div>
+
+
+
+<div class="viewcode-block" id="runge_kutta_4">
+<a class="viewcode-back" href="../../../_autosummary/marinade.util.ode_solvers.runge_kutta_4.html#marinade.util.ode_solvers.runge_kutta_4">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">runge_kutta_4</span><span class="p">(</span>
+    <span class="n">concentration</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">TensorDict</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">],</span>
+    <span class="n">dt</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">],</span>
+    <span class="n">dynamic_inputs</span><span class="p">:</span> <span class="n">TensorDict</span><span class="p">,</span>
+    <span class="n">rhs_function</span><span class="p">:</span> <span class="n">Callable</span><span class="p">,</span>
+    <span class="o">*</span><span class="n">args</span><span class="p">,</span>
+    <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
+<span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Fourth-order explicit Runge-Kutta scheme according to:</span>
+
+<span class="sd">    .. math::</span>
+<span class="sd">        k_1 &amp;= f(c^n) \\\\</span>
+<span class="sd">        k_2 &amp;= f(c^n + \\frac{\\Delta t}{2} k_1) \\\\</span>
+<span class="sd">        k_3 &amp;= f(c^n + \\frac{\\Delta t}{2} k_2) \\\\</span>
+<span class="sd">        k_4 &amp;= f(c^n + \\Delta t\, k_3) \\\\</span>
+<span class="sd">        c^{n+1} &amp;= c^n + \\frac{\\Delta t}{6}(k_1 + 2k_2 + 2k_3 + k_4)</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        concentration (Union[TensorDict, torch.Tensor]): The current state</span>
+<span class="sd">        dt (Union[float, torch.Tensor]): The time step</span>
+<span class="sd">        dynamic_inputs (TensorDict): Inputs to the model, e.g. temperature, salinity, ...</span>
+<span class="sd">        rhs_function (Callable): Right-hand side function :math:`f`</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        (TensorDict or torch.Tensor): The new state</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">rhs</span> <span class="o">=</span> <span class="n">rhs_function</span><span class="p">(</span><span class="n">concentration</span><span class="p">,</span> <span class="n">dynamic_inputs</span><span class="p">,</span> <span class="n">first</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+
+    <span class="n">rhs_1</span> <span class="o">=</span> <span class="n">rhs</span> <span class="o">/</span> <span class="mf">2.0</span>
+
+    <span class="n">concentration_1</span> <span class="o">=</span> <span class="n">partial_add_tensordict</span><span class="p">(</span><span class="n">concentration</span><span class="p">,</span> <span class="n">dt</span> <span class="o">*</span> <span class="n">rhs_1</span><span class="p">)</span>
+
+    <span class="n">rhs</span> <span class="o">=</span> <span class="n">rhs_function</span><span class="p">(</span><span class="n">concentration_1</span><span class="p">,</span> <span class="n">dynamic_inputs</span><span class="p">,</span> <span class="n">first</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+
+    <span class="n">rhs_1</span> <span class="o">=</span> <span class="n">rhs_1</span> <span class="o">+</span> <span class="n">rhs</span>
+
+    <span class="n">concentration_1</span> <span class="o">=</span> <span class="n">partial_add_tensordict</span><span class="p">(</span><span class="n">concentration</span><span class="p">,</span> <span class="n">dt</span> <span class="o">/</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">rhs</span><span class="p">)</span>
+
+    <span class="n">rhs</span> <span class="o">=</span> <span class="n">rhs_function</span><span class="p">(</span><span class="n">concentration_1</span><span class="p">,</span> <span class="n">dynamic_inputs</span><span class="p">,</span> <span class="n">first</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+
+    <span class="n">rhs_1</span> <span class="o">=</span> <span class="n">rhs_1</span> <span class="o">+</span> <span class="n">rhs</span>
+
+    <span class="n">concentration_1</span> <span class="o">=</span> <span class="n">partial_add_tensordict</span><span class="p">(</span><span class="n">concentration</span><span class="p">,</span> <span class="n">dt</span> <span class="o">*</span> <span class="n">rhs</span><span class="p">)</span>
+
+    <span class="n">rhs</span> <span class="o">=</span> <span class="n">rhs_function</span><span class="p">(</span><span class="n">concentration_1</span><span class="p">,</span> <span class="n">dynamic_inputs</span><span class="p">,</span> <span class="n">first</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+
+    <span class="n">rhs_1</span> <span class="o">=</span> <span class="n">rhs_1</span> <span class="o">+</span> <span class="n">rhs</span> <span class="o">/</span> <span class="mf">2.0</span>
+
+    <span class="n">concentration</span> <span class="o">=</span> <span class="n">partial_add_tensordict</span><span class="p">(</span><span class="n">concentration</span><span class="p">,</span> <span class="n">dt</span> <span class="o">/</span> <span class="mf">3.0</span> <span class="o">*</span> <span class="n">rhs_1</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">concentration</span></div>
+
+
+
+<div class="viewcode-block" id="partial_add_tensordict">
+<a class="viewcode-back" href="../../../_autosummary/marinade.util.ode_solvers.partial_add_tensordict.html#marinade.util.ode_solvers.partial_add_tensordict">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">partial_add_tensordict</span><span class="p">(</span><span class="n">a</span><span class="p">:</span> <span class="n">TensorDict</span><span class="p">,</span> <span class="n">b</span><span class="p">:</span> <span class="n">TensorDict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">TensorDict</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Helper function for adding TensorDicts a and b, where the keys of b are a subset of the keys of a.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        a (TensorDict): One TensorDict</span>
+<span class="sd">        b (TensorDict): Another TensorDict which has only keys also present in a</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        TensorDict: a + b</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="n">TensorDict</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">a</span> <span class="o">+</span> <span class="n">b</span>
+
+    <span class="n">_increment</span> <span class="o">=</span> <span class="n">b</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">add</span><span class="p">,</span> <span class="n">a</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">a</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">_increment</span><span class="p">)</span></div>
+
+</pre></div>
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../../../index.html">
+              <img class="logo" src="../../../_static/m-dml_logo_banner_cropped.png" alt="Logo of MARINADE"/>
+            </a></p>
+<h1 class="logo"><a href="../../../index.html">MARINADE</a></h1>
+
+
+
+
+
+
+
+
+
+<search id="searchbox" style="display: none" role="search">
+    <div class="searchformwrapper">
+    <form class="search" action="../../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Search"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script><h3>Navigation</h3>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../index.html">Documentation of MARINADE</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../backward.html">Tridiagonal Backward Pass</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../backward.html#tridiagonal-forward-pass">Tridiagonal Forward Pass</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../_autosummary/marinade.html">marinade</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../../../index.html">Documentation overview</a><ul>
+  <li><a href="../../index.html">Module code</a><ul>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &#169;2026, m-dml team.
+      
+      |
+      Powered by <a href="https://www.sphinx-doc.org/">Sphinx 9.2.0</a>
+      &amp; <a href="https://alabaster.readthedocs.io">Alabaster 1.0.0</a>
+      
+    </div>
+
+    
+
+    
+  </body>
+</html>

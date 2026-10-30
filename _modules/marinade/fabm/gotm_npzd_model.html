@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../../../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>marinade.fabm.gotm_npzd_model &#8212; MARINADE 1.0.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=5ecbeea2" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/basic.css?v=b08954a9" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/alabaster.css?v=27fed22d" />
+    <script src="../../../_static/documentation_options.js?v=8d563738"></script>
+    <script src="../../../_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <link rel="icon" href="../../../_static/m-dml_logo_dark.png"/>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" />
+   
+  <link rel="stylesheet" href="../../../_static/custom.css" type="text/css" />
+  
+
+  
+  
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <h1>Source code for marinade.fabm.gotm_npzd_model</h1><div class="highlight"><pre>
+<span></span><span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Union</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">yaml</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">marinade.fabm.bio_model</span><span class="w"> </span><span class="kn">import</span> <span class="n">BioModel</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">tensordict</span><span class="w"> </span><span class="kn">import</span> <span class="n">TensorDict</span>
+
+
+<div class="viewcode-block" id="GOTMNPZDModel">
+<a class="viewcode-back" href="../../../_autosummary/marinade.fabm.gotm_npzd_model.GOTMNPZDModel.html#marinade.fabm.gotm_npzd_model.GOTMNPZDModel">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">GOTMNPZDModel</span><span class="p">(</span><span class="n">BioModel</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;This class describes a toy biosystem model with four tracers: Nutrients, phytoplankton, zooplankton and</span>
+<span class="sd">    detritus.</span>
+
+<span class="sd">    If created by the constructor method, this model uses the same default parameters as the version of this model</span>
+<span class="sd">    provided by FABM. A model with custom parameters can be created from a .yaml file with</span>
+<span class="sd">    *GOTMNPZDModel.create_model_from_yaml_file*.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        ode_method (str): The numerical method for solving the tracer ODE. Supported schemes:</span>
+<span class="sd">            (&quot;FE&quot;: Forward Euler, &quot;RK2&quot;: 2nd order Runge-Kutta, &quot;RK4&quot;: 4th order Runge-Kutta)</span>
+<span class="sd">        model_name (str, optional): The name of the model. Defaults to &quot;npzd&quot;.</span>
+<span class="sd">        device (str, optional): The device where the tensors of the model should be stored. Defaults to &quot;cpu&quot;.</span>
+<span class="sd">        dtype (torch.dtype, optional): The default data type of the model. Defaults to torch.float64.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">ode_method</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">model_name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;npzd&quot;</span><span class="p">,</span>
+        <span class="n">device</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;cpu&quot;</span><span class="p">,</span>
+        <span class="n">dtype</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">dtype</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">float64</span><span class="p">,</span>
+        <span class="o">*</span><span class="n">args</span><span class="p">,</span>
+        <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
+    <span class="p">):</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">dtype</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+            <span class="n">dtype</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">torch</span><span class="p">,</span> <span class="n">dtype</span><span class="p">)</span>
+
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">ode_method</span><span class="o">=</span><span class="n">ode_method</span><span class="p">,</span> <span class="n">model_name</span><span class="o">=</span><span class="n">model_name</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">tracer_names</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span>
+            <span class="p">[</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">model_name</span><span class="si">}</span><span class="s2">_nut&quot;</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">model_name</span><span class="si">}</span><span class="s2">_phy&quot;</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">model_name</span><span class="si">}</span><span class="s2">_zoo&quot;</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">model_name</span><span class="si">}</span><span class="s2">_det&quot;</span><span class="p">]</span>
+        <span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;p0&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span>
+            <span class="mf">0.0225</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span>
+        <span class="p">)</span>  <span class="c1"># background phytoplankton concentration (mmol m-3), default = 0.0225</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;z0&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span>
+            <span class="mf">0.0225</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span>
+        <span class="p">)</span>  <span class="c1"># background zooplankton concentration (mmol m-3), default = 0.0225</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;kc&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span>
+            <span class="mf">0.03</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span>
+        <span class="p">)</span>  <span class="c1"># specific light extinction of phytoplankton and detritus (m2 mmol-1), default = 0.03</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;i_min&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span>
+            <span class="mf">25.0</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span>
+        <span class="p">)</span>  <span class="c1"># minimum light intensity in euphotic zone (W m-2), default = 25.0</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;rmax&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span>
+            <span class="mf">1.0</span> <span class="o">/</span> <span class="mi">86400</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span>
+        <span class="p">)</span>  <span class="c1"># maximum specific growth rate of phytoplankton (d-1), default = 1.0</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;gmax&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span>
+            <span class="mf">0.2</span> <span class="o">/</span> <span class="mi">86400</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span>
+        <span class="p">)</span>  <span class="c1"># maximum specific grazing rate of zooplankton (d-1), default = 0.5</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;iv&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span>
+            <span class="mf">1.1</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span>
+        <span class="p">)</span>  <span class="c1"># Ivlev grazing constant (m3 mmol-1), default = 1.1</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;alpha&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span>
+            <span class="mf">1.35</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span>
+        <span class="p">)</span>  <span class="c1"># half-saturation nutrient concentration for phytoplankton (mmol m-3), default = 0.3</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;rpn&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span>
+            <span class="mf">0.01</span> <span class="o">/</span> <span class="mi">86400</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span>
+        <span class="p">)</span>  <span class="c1"># loss rate of phytoplankton to nutrients (d-1), default = 0.01</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;rzn&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span>
+            <span class="mf">0.01</span> <span class="o">/</span> <span class="mi">86400</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span>
+        <span class="p">)</span>  <span class="c1"># loss rate of zooplankton to nutrients (d-1), default = 0.01</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;rdn&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span>
+            <span class="mf">0.003</span> <span class="o">/</span> <span class="mi">86400</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span>
+        <span class="p">)</span>  <span class="c1"># detritus remineralization rate (d-1), default = 0.003</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;rpdu&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span>
+            <span class="mf">0.02</span> <span class="o">/</span> <span class="mi">86400</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span>
+        <span class="p">)</span>  <span class="c1"># phytoplankton mortality in euphotic zone (d-1), default = 0.02</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;rpdl&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span>
+            <span class="mf">0.1</span> <span class="o">/</span> <span class="mi">86400</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span>
+        <span class="p">)</span>  <span class="c1"># phytoplankton mortality below euphotic zone (d-1), default = 0.1</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;rzd&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span>
+            <span class="mf">0.02</span> <span class="o">/</span> <span class="mi">86400</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span>
+        <span class="p">)</span>  <span class="c1"># zooplankton mortality (d-1), default = 0.02</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;dic_per_n&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span>
+            <span class="mf">106.0</span> <span class="o">/</span> <span class="mf">16.0</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span>
+        <span class="p">)</span>  <span class="c1"># molar C:N ratio of biomass, default=106.0_rk/16.0_rk)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;w_p&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span>
+            <span class="o">-</span><span class="mf">1.0</span> <span class="o">/</span> <span class="mi">86400</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span>
+        <span class="p">)</span>  <span class="c1"># vertical velocity of phytoplankton (&lt;0 for sinking) (m d-1), default = -1.0</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;w_d&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span>
+            <span class="o">-</span><span class="mf">5.0</span> <span class="o">/</span> <span class="mi">86400</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span>
+        <span class="p">)</span>  <span class="c1"># vertical velocity of detritus (&lt;0 for sinking) (m d-1), default = -5.0</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">ws</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span>
+            <span class="p">[[</span><span class="mf">0.0</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;w_p&quot;</span><span class="p">],</span> <span class="mf">0.0</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;w_d&quot;</span><span class="p">]]],</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span>
+        <span class="p">)</span><span class="o">.</span><span class="n">unsqueeze</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">minimum</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">([</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">],</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">)</span><span class="o">.</span><span class="n">unsqueeze</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span><span class="o">.</span><span class="n">unsqueeze</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">minimum_td</span> <span class="o">=</span> <span class="n">TensorDict</span><span class="p">({</span><span class="s2">&quot;pelagic&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">minimum</span><span class="p">})</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">light_attenuation_indexes</span> <span class="o">=</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">light_attenuation_scale_factor</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;kc&quot;</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">light_attenuation_background</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;p0&quot;</span><span class="p">]</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;kc&quot;</span><span class="p">]</span>
+
+<div class="viewcode-block" id="GOTMNPZDModel.create_model_from_yaml_file">
+<a class="viewcode-back" href="../../../_autosummary/marinade.fabm.gotm_npzd_model.GOTMNPZDModel.html#marinade.fabm.gotm_npzd_model.GOTMNPZDModel.create_model_from_yaml_file">[docs]</a>
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">create_model_from_yaml_file</span><span class="p">(</span>
+        <span class="bp">cls</span><span class="p">,</span>
+        <span class="n">path_fabm</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">path_gotm</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">device</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;cpu&quot;</span><span class="p">,</span>
+        <span class="n">dtype</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">dtype</span><span class="p">]</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">float64</span><span class="p">,</span>
+        <span class="o">*</span><span class="n">args</span><span class="p">,</span>
+        <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
+    <span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Creates a GOTMNPZDModel instance from .yaml configuration files. Should generally be used instead of the</span>
+<span class="sd">        constructor. Designed to be compatible with the configuration files of GOTM.</span>
+
+<span class="sd">        Should be overwritten by subclasses.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            path_fabm (str): Path to the FABM .yaml configuration file</span>
+<span class="sd">            path_gotm (str): Path to the GOTM .yaml configuration file</span>
+<span class="sd">            device (str, optional): Torch device. Defaults to &quot;cpu&quot;.</span>
+<span class="sd">            dtype (Union[str, torch.dtype], optional): Torch data type. Defaults to torch.float64.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            GOTMNPZDModel: The generated model</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">_parameters</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;p0&quot;</span><span class="p">,</span> <span class="s2">&quot;z0&quot;</span><span class="p">,</span> <span class="s2">&quot;kc&quot;</span><span class="p">,</span> <span class="s2">&quot;i_min&quot;</span><span class="p">,</span> <span class="s2">&quot;iv&quot;</span><span class="p">,</span> <span class="s2">&quot;alpha&quot;</span><span class="p">]</span>  <span class="c1"># , &#39;dic_per_n&#39;]</span>
+        <span class="n">_parameters_daily</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;rmax&quot;</span><span class="p">,</span> <span class="s2">&quot;gmax&quot;</span><span class="p">,</span> <span class="s2">&quot;rpn&quot;</span><span class="p">,</span> <span class="s2">&quot;rzn&quot;</span><span class="p">,</span> <span class="s2">&quot;rdn&quot;</span><span class="p">,</span> <span class="s2">&quot;rpdu&quot;</span><span class="p">,</span> <span class="s2">&quot;rpdl&quot;</span><span class="p">,</span> <span class="s2">&quot;rzd&quot;</span><span class="p">,</span> <span class="s2">&quot;w_p&quot;</span><span class="p">,</span> <span class="s2">&quot;w_d&quot;</span><span class="p">]</span>
+        <span class="n">_seconds_per_day</span> <span class="o">=</span> <span class="mf">86400.0</span>
+
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">dtype</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+            <span class="n">dtype</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">torch</span><span class="p">,</span> <span class="n">dtype</span><span class="p">)</span>
+
+        <span class="c1"># load the GOTM and FABM .yaml config files:</span>
+        <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">path_gotm</span><span class="p">,</span> <span class="s2">&quot;r&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">file_gotm</span><span class="p">:</span>
+            <span class="n">config_gotm</span> <span class="o">=</span> <span class="n">yaml</span><span class="o">.</span><span class="n">safe_load</span><span class="p">(</span><span class="n">file_gotm</span><span class="p">)</span>
+        <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">path_fabm</span><span class="p">,</span> <span class="s2">&quot;r&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">file_fabm</span><span class="p">:</span>
+            <span class="n">config_fabm</span> <span class="o">=</span> <span class="n">yaml</span><span class="o">.</span><span class="n">safe_load</span><span class="p">(</span><span class="n">file_fabm</span><span class="p">)</span>
+
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">ode_method</span> <span class="o">=</span> <span class="n">config_gotm</span><span class="p">[</span><span class="s2">&quot;fabm&quot;</span><span class="p">][</span><span class="s2">&quot;numerics&quot;</span><span class="p">][</span><span class="s2">&quot;ode_method&quot;</span><span class="p">]</span>
+        <span class="k">except</span> <span class="p">(</span><span class="ne">KeyError</span><span class="p">,</span> <span class="ne">ValueError</span><span class="p">,</span> <span class="ne">TypeError</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;fabm/numerics/ode_method missing or invalid in </span><span class="si">{</span><span class="n">path_gotm</span><span class="si">}</span><span class="s2">.&quot;</span><span class="p">)</span>
+
+        <span class="n">_model_detected</span> <span class="o">=</span> <span class="kc">False</span>
+
+        <span class="k">for</span> <span class="n">name_instance</span><span class="p">,</span> <span class="n">config_instance</span> <span class="ow">in</span> <span class="n">config_fabm</span><span class="p">[</span><span class="s2">&quot;instances&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="k">if</span> <span class="n">config_instance</span><span class="p">[</span><span class="s2">&quot;model&quot;</span><span class="p">]</span> <span class="o">==</span> <span class="s2">&quot;gotm/npzd&quot;</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">_model_detected</span><span class="p">:</span>
+                    <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;More than one NPZD model detected in file </span><span class="si">{</span><span class="n">file_fabm</span><span class="si">}</span><span class="s2">!&quot;</span><span class="p">)</span>
+                <span class="n">_model_detected</span> <span class="o">=</span> <span class="kc">True</span>
+
+                <span class="n">model</span> <span class="o">=</span> <span class="bp">cls</span><span class="p">(</span>
+                    <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span> <span class="n">ode_method</span><span class="o">=</span><span class="n">ode_method</span><span class="p">,</span> <span class="n">model_name</span><span class="o">=</span><span class="n">name_instance</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span>
+                <span class="p">)</span>
+                <span class="k">for</span> <span class="n">_name</span> <span class="ow">in</span> <span class="n">_parameters</span><span class="p">:</span>
+                    <span class="k">try</span><span class="p">:</span>
+                        <span class="n">model</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="n">_name</span><span class="p">]</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span>
+                            <span class="n">config_instance</span><span class="p">[</span><span class="s2">&quot;parameters&quot;</span><span class="p">][</span><span class="n">_name</span><span class="p">],</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span>
+                        <span class="p">)</span>
+                    <span class="k">except</span> <span class="p">(</span><span class="ne">KeyError</span><span class="p">,</span> <span class="ne">ValueError</span><span class="p">,</span> <span class="ne">TypeError</span><span class="p">):</span>
+                        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                            <span class="sa">f</span><span class="s2">&quot;instances/</span><span class="si">{</span><span class="n">name_instance</span><span class="si">}</span><span class="s2">/parameters/</span><span class="si">{</span><span class="n">_name</span><span class="si">}</span><span class="s2"> missing or invalid</span><span class="se">\</span>
+<span class="s2">                                        in </span><span class="si">{</span><span class="n">path_fabm</span><span class="si">}</span><span class="s2">. Expected type float.&quot;</span>
+                        <span class="p">)</span>
+                <span class="k">for</span> <span class="n">_name</span> <span class="ow">in</span> <span class="n">_parameters_daily</span><span class="p">:</span>
+                    <span class="k">try</span><span class="p">:</span>
+                        <span class="n">model</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="n">_name</span><span class="p">]</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span>
+                            <span class="n">config_instance</span><span class="p">[</span><span class="s2">&quot;parameters&quot;</span><span class="p">][</span><span class="n">_name</span><span class="p">]</span> <span class="o">/</span> <span class="n">_seconds_per_day</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span>
+                        <span class="p">)</span>
+                    <span class="k">except</span> <span class="p">(</span><span class="ne">KeyError</span><span class="p">,</span> <span class="ne">ValueError</span><span class="p">,</span> <span class="ne">TypeError</span><span class="p">):</span>
+                        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                            <span class="sa">f</span><span class="s2">&quot;instances/</span><span class="si">{</span><span class="n">name_instance</span><span class="si">}</span><span class="s2">/parameters/</span><span class="si">{</span><span class="n">_name</span><span class="si">}</span><span class="s2"> missing or invalid</span><span class="se">\</span>
+<span class="s2">                                        in </span><span class="si">{</span><span class="n">path_fabm</span><span class="si">}</span><span class="s2">. Expected type float.&quot;</span>
+                        <span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">_model_detected</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;No NPZD model detected in file </span><span class="si">{</span><span class="n">file_fabm</span><span class="si">}</span><span class="s2">! Please specify an NPZD model according to the following</span><span class="se">\</span>
+<span class="s2">                    template:</span><span class="se">\n</span><span class="s2">instances:</span><span class="se">\n</span><span class="s2">  npzd:</span><span class="se">\n</span><span class="s2">    model: gotm/npzd</span><span class="se">\n</span><span class="s2">    parameters:</span><span class="se">\n</span><span class="s2">      p0  :  0.0225  #</span><span class="se">\</span>
+<span class="s2">                    default</span><span class="se">\n</span><span class="s2">      z0  :  0.0225  # default</span><span class="se">\n</span><span class="s2">      ...&quot;</span>
+            <span class="p">)</span>
+
+        <span class="n">model</span><span class="o">.</span><span class="n">ws</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="n">torch</span><span class="o">.</span><span class="n">stack</span><span class="p">(</span>
+                <span class="p">[</span>
+                    <span class="n">torch</span><span class="o">.</span><span class="n">zeros_like</span><span class="p">(</span><span class="n">model</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;w_p&quot;</span><span class="p">]),</span>
+                    <span class="n">model</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;w_p&quot;</span><span class="p">],</span>
+                    <span class="n">torch</span><span class="o">.</span><span class="n">zeros_like</span><span class="p">(</span><span class="n">model</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;w_d&quot;</span><span class="p">]),</span>
+                    <span class="n">model</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;w_d&quot;</span><span class="p">],</span>
+                <span class="p">]</span>
+            <span class="p">)</span>
+            <span class="o">.</span><span class="n">unsqueeze</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+            <span class="o">.</span><span class="n">unsqueeze</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+        <span class="p">)</span>
+        <span class="n">model</span><span class="o">.</span><span class="n">light_attenuation_scale_factor</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;kc&quot;</span><span class="p">]</span>
+        <span class="n">model</span><span class="o">.</span><span class="n">light_attenuation_background</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;p0&quot;</span><span class="p">]</span> <span class="o">*</span> <span class="n">model</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;kc&quot;</span><span class="p">]</span>
+
+        <span class="k">return</span> <span class="n">model</span></div>
+
+
+<div class="viewcode-block" id="GOTMNPZDModel.update_parameters">
+<a class="viewcode-back" href="../../../_autosummary/marinade.fabm.gotm_npzd_model.GOTMNPZDModel.html#marinade.fabm.gotm_npzd_model.GOTMNPZDModel.update_parameters">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">update_parameters</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">parameters</span><span class="p">:</span> <span class="n">TensorDict</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Update the parameters of the model.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            parameters (TensorDict): The model parameters to be updated</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">update_parameters</span><span class="p">(</span><span class="n">parameters</span><span class="p">)</span>
+
+        <span class="n">_zero</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">zeros_like</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;w_p&quot;</span><span class="p">])</span>
+        <span class="k">if</span> <span class="n">_zero</span><span class="o">.</span><span class="n">ndim</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">ws</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">stack</span><span class="p">([</span><span class="n">_zero</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;w_p&quot;</span><span class="p">],</span> <span class="n">_zero</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;w_d&quot;</span><span class="p">]])[</span><span class="kc">None</span><span class="p">,</span> <span class="p">:,</span> <span class="kc">None</span><span class="p">]</span>
+        <span class="k">elif</span> <span class="n">_zero</span><span class="o">.</span><span class="n">ndim</span> <span class="o">&gt;</span> <span class="mi">2</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">ws</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">cat</span><span class="p">([</span><span class="n">_zero</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;w_p&quot;</span><span class="p">],</span> <span class="n">_zero</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;w_d&quot;</span><span class="p">]],</span> <span class="n">dim</span><span class="o">=-</span><span class="mi">2</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">Exception</span><span class="p">(</span>
+                <span class="s2">&quot;Invalid shape for sinking rate parameter w_p! It should be scalar or of shape [batch, 1, z].&quot;</span>
+            <span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">light_attenuation_scale_factor</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;kc&quot;</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">light_attenuation_background</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;p0&quot;</span><span class="p">]</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;kc&quot;</span><span class="p">]</span></div>
+
+
+<div class="viewcode-block" id="GOTMNPZDModel.fnp">
+<a class="viewcode-back" href="../../../_autosummary/marinade.fabm.gotm_npzd_model.GOTMNPZDModel.html#marinade.fabm.gotm_npzd_model.GOTMNPZDModel.fnp">[docs]</a>
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">fnp</span><span class="p">(</span><span class="n">rmax</span><span class="p">,</span> <span class="n">alpha</span><span class="p">,</span> <span class="n">n</span><span class="p">,</span> <span class="n">p</span><span class="p">,</span> <span class="n">par</span><span class="p">,</span> <span class="n">iopt</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Helper method for phytoplankton growth, see GOTM/FABM source code and documentation.&quot;&quot;&quot;</span>
+        <span class="n">fnp</span> <span class="o">=</span> <span class="n">rmax</span> <span class="o">*</span> <span class="n">par</span> <span class="o">/</span> <span class="n">iopt</span> <span class="o">*</span> <span class="n">torch</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="mf">1.0</span> <span class="o">-</span> <span class="n">par</span> <span class="o">/</span> <span class="n">iopt</span><span class="p">)</span> <span class="o">*</span> <span class="n">n</span> <span class="o">/</span> <span class="p">(</span><span class="n">alpha</span> <span class="o">+</span> <span class="n">n</span><span class="p">)</span> <span class="o">*</span> <span class="n">p</span>
+        <span class="k">return</span> <span class="n">fnp</span></div>
+
+
+<div class="viewcode-block" id="GOTMNPZDModel.fpz">
+<a class="viewcode-back" href="../../../_autosummary/marinade.fabm.gotm_npzd_model.GOTMNPZDModel.html#marinade.fabm.gotm_npzd_model.GOTMNPZDModel.fpz">[docs]</a>
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">fpz</span><span class="p">(</span><span class="n">gmax</span><span class="p">,</span> <span class="n">iv</span><span class="p">,</span> <span class="n">p</span><span class="p">,</span> <span class="n">z</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Helper method for zooplankton grazing, see GOTM/FABM source code and documentation.&quot;&quot;&quot;</span>
+        <span class="n">fpz</span> <span class="o">=</span> <span class="n">gmax</span> <span class="o">*</span> <span class="p">(</span><span class="mf">1.0</span> <span class="o">-</span> <span class="n">torch</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="o">-</span><span class="n">iv</span> <span class="o">*</span> <span class="n">iv</span> <span class="o">*</span> <span class="n">p</span> <span class="o">*</span> <span class="n">p</span><span class="p">))</span> <span class="o">*</span> <span class="n">z</span>
+        <span class="k">return</span> <span class="n">fpz</span></div>
+
+
+<div class="viewcode-block" id="GOTMNPZDModel.do">
+<a class="viewcode-back" href="../../../_autosummary/marinade.fabm.gotm_npzd_model.GOTMNPZDModel.html#marinade.fabm.gotm_npzd_model.GOTMNPZDModel.do">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">do</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">concentration</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">TensorDict</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">],</span> <span class="n">dynamic_inputs</span><span class="p">:</span> <span class="n">TensorDict</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Union</span><span class="p">[</span><span class="n">TensorDict</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Calculate right-hand side of biological time step ODE as a vector with temporal derivatives.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            Union[TensorDict, torch.Tensor]: Vector of temporal derivatives</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="n">use_state_light</span> <span class="o">=</span> <span class="kc">False</span>
+
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">concentration</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">):</span>
+            <span class="n">x</span> <span class="o">=</span> <span class="n">concentration</span>
+        <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">concentration</span><span class="p">,</span> <span class="n">TensorDict</span><span class="p">):</span>
+            <span class="n">x</span> <span class="o">=</span> <span class="n">concentration</span><span class="p">[</span><span class="s2">&quot;pelagic&quot;</span><span class="p">]</span>
+            <span class="n">use_state_light</span> <span class="o">=</span> <span class="s2">&quot;light_par&quot;</span> <span class="ow">in</span> <span class="n">concentration</span>
+
+        <span class="n">n</span> <span class="o">=</span> <span class="n">x</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="p">:]</span>
+        <span class="n">p</span> <span class="o">=</span> <span class="n">x</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="p">:]</span>
+        <span class="n">z</span> <span class="o">=</span> <span class="n">x</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="p">:]</span>
+        <span class="n">d</span> <span class="o">=</span> <span class="n">x</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="p">:]</span>
+
+        <span class="k">if</span> <span class="n">use_state_light</span><span class="p">:</span>
+            <span class="n">par0</span> <span class="o">=</span> <span class="n">concentration</span><span class="p">[</span><span class="s2">&quot;light_par0&quot;</span><span class="p">]</span>
+            <span class="n">par</span> <span class="o">=</span> <span class="n">concentration</span><span class="p">[</span><span class="s2">&quot;light_par&quot;</span><span class="p">]</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">par0</span> <span class="o">=</span> <span class="n">dynamic_inputs</span><span class="p">[</span><span class="s2">&quot;par0&quot;</span><span class="p">]</span>
+            <span class="n">par</span> <span class="o">=</span> <span class="n">dynamic_inputs</span><span class="p">[</span><span class="s2">&quot;par&quot;</span><span class="p">]</span>
+
+        <span class="k">if</span> <span class="n">par0</span><span class="o">.</span><span class="n">ndim</span> <span class="o">&lt;</span> <span class="n">par</span><span class="o">.</span><span class="n">ndim</span><span class="p">:</span>
+            <span class="n">par0</span> <span class="o">=</span> <span class="n">par0</span><span class="o">.</span><span class="n">unsqueeze</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+
+        <span class="n">iopt</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">clamp_min</span><span class="p">(</span><span class="mf">0.25</span> <span class="o">*</span> <span class="n">par0</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;i_min&quot;</span><span class="p">])</span>
+
+        <span class="n">rpd</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">mask_func</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;i_min&quot;</span><span class="p">]</span> <span class="o">-</span> <span class="n">par</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;rpdl&quot;</span><span class="p">],</span> <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;rpdu&quot;</span><span class="p">])</span>
+
+        <span class="n">primprod</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">fnp</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;rmax&quot;</span><span class="p">],</span> <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;alpha&quot;</span><span class="p">],</span> <span class="n">n</span><span class="p">,</span> <span class="n">p</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;p0&quot;</span><span class="p">],</span> <span class="n">par</span><span class="p">,</span> <span class="n">iopt</span><span class="p">)</span>
+        <span class="n">g</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">fpz</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;gmax&quot;</span><span class="p">],</span> <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;iv&quot;</span><span class="p">],</span> <span class="n">p</span><span class="p">,</span> <span class="n">z</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;z0&quot;</span><span class="p">])</span>
+
+        <span class="n">dn</span> <span class="o">=</span> <span class="o">-</span><span class="n">primprod</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;rpn&quot;</span><span class="p">]</span> <span class="o">*</span> <span class="n">p</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;rzn&quot;</span><span class="p">]</span> <span class="o">*</span> <span class="n">z</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;rdn&quot;</span><span class="p">]</span> <span class="o">*</span> <span class="n">d</span>
+        <span class="n">dp</span> <span class="o">=</span> <span class="n">primprod</span> <span class="o">-</span> <span class="n">g</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;rpn&quot;</span><span class="p">]</span> <span class="o">*</span> <span class="n">p</span> <span class="o">-</span> <span class="n">rpd</span> <span class="o">*</span> <span class="n">p</span>
+        <span class="n">dz</span> <span class="o">=</span> <span class="n">g</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;rzn&quot;</span><span class="p">]</span> <span class="o">*</span> <span class="n">z</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;rzd&quot;</span><span class="p">]</span> <span class="o">*</span> <span class="n">z</span>
+        <span class="n">dd</span> <span class="o">=</span> <span class="n">rpd</span> <span class="o">*</span> <span class="n">p</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;rzd&quot;</span><span class="p">]</span> <span class="o">*</span> <span class="n">z</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;rdn&quot;</span><span class="p">]</span> <span class="o">*</span> <span class="n">d</span>
+
+        <span class="n">dx</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">stack</span><span class="p">([</span><span class="n">dn</span><span class="p">,</span> <span class="n">dp</span><span class="p">,</span> <span class="n">dz</span><span class="p">,</span> <span class="n">dd</span><span class="p">],</span> <span class="n">axis</span><span class="o">=-</span><span class="mi">2</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">concentration</span><span class="p">,</span> <span class="n">TensorDict</span><span class="p">):</span>
+            <span class="k">return</span> <span class="n">TensorDict</span><span class="p">({</span><span class="s2">&quot;pelagic&quot;</span><span class="p">:</span> <span class="n">dx</span><span class="p">},</span> <span class="n">batch_size</span><span class="o">=</span><span class="n">concentration</span><span class="o">.</span><span class="n">batch_size</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">dx</span></div>
+
+
+<div class="viewcode-block" id="GOTMNPZDModel.do_ppdd">
+<a class="viewcode-back" href="../../../_autosummary/marinade.fabm.gotm_npzd_model.GOTMNPZDModel.html#marinade.fabm.gotm_npzd_model.GOTMNPZDModel.do_ppdd">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">do_ppdd</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Calculate source/sink terms of biological variables as production and destruction matrices.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            NotImplementedError: This method still has to be implemented.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">()</span></div>
+</div>
+
+</pre></div>
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../../../index.html">
+              <img class="logo" src="../../../_static/m-dml_logo_banner_cropped.png" alt="Logo of MARINADE"/>
+            </a></p>
+<h1 class="logo"><a href="../../../index.html">MARINADE</a></h1>
+
+
+
+
+
+
+
+
+
+<search id="searchbox" style="display: none" role="search">
+    <div class="searchformwrapper">
+    <form class="search" action="../../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Search"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script><h3>Navigation</h3>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../index.html">Documentation of MARINADE</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../backward.html">Tridiagonal Backward Pass</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../backward.html#tridiagonal-forward-pass">Tridiagonal Forward Pass</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../_autosummary/marinade.html">marinade</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../../../index.html">Documentation overview</a><ul>
+  <li><a href="../../index.html">Module code</a><ul>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &#169;2026, m-dml team.
+      
+      |
+      Powered by <a href="https://www.sphinx-doc.org/">Sphinx 9.2.0</a>
+      &amp; <a href="https://alabaster.readthedocs.io">Alabaster 1.0.0</a>
+      
+    </div>
+
+    
+
+    
+  </body>
+</html>

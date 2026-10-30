@@ -1,0 +1,6 @@
+euler\_forward
+==============
+
+.. currentmodule:: marinade.util.ode_solvers
+
+.. autofunction:: euler_forward

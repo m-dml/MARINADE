@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="./">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Tridiagonal Backward Pass &#8212; MARINADE 1.0.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=5ecbeea2" />
+    <link rel="stylesheet" type="text/css" href="_static/basic.css?v=b08954a9" />
+    <link rel="stylesheet" type="text/css" href="_static/alabaster.css?v=27fed22d" />
+    <script src="_static/documentation_options.js?v=8d563738"></script>
+    <script src="_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@4/tex-mml-chtml.js"></script>
+    <link rel="icon" href="_static/m-dml_logo_dark.png"/>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="marinade" href="_autosummary/marinade.html" />
+    <link rel="prev" title="Documentation of MARINADE" href="index.html" />
+   
+  <link rel="stylesheet" href="_static/custom.css" type="text/css" />
+  
+
+  
+  
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="tridiagonal-backward-pass">
+<span id="backward"></span><h1>Tridiagonal Backward Pass<a class="headerlink" href="#tridiagonal-backward-pass" title="Link to this heading">¶</a></h1>
+<p>We implement a tridiagonal solve for <span class="math notranslate nohighlight">\(\mathbf{A}\mathbf{x} = \mathbf{y}\)</span>, where <span class="math notranslate nohighlight">\(\mathbf{A}\)</span> is a tridiagonal matrix:</p>
+<div class="math notranslate nohighlight">
+\[\begin{split}\mathbf{A} = \begin{bmatrix}
+    b_1    &amp; c_1    &amp; 0      &amp; 0      &amp; \cdots   &amp; 0       &amp; 0       &amp; 0 \\
+    a_1    &amp; b_2    &amp; c_2    &amp; 0      &amp; \cdots   &amp; 0       &amp; 0       &amp; 0 \\
+    0      &amp; a_2    &amp; b_3    &amp; 0      &amp; \cdots   &amp; 0       &amp; 0       &amp; 0 \\
+    \vdots &amp; \vdots &amp; \vdots &amp; \vdots &amp; \ddots   &amp; \vdots  &amp; \vdots  &amp; \vdots \\
+    0      &amp; 0      &amp; 0      &amp; 0      &amp; \cdots   &amp; a_{n-2} &amp; b_{n-1} &amp; c_{n-1} \\
+    0      &amp; 0      &amp; 0      &amp; 0      &amp; \cdots   &amp; 0       &amp; a_{n-1} &amp; b_{n} \\
+\end{bmatrix}\end{split}\]</div>
+<p>How do we compute gradients through the solver operation <span class="math notranslate nohighlight">\(\mathbf{a}, \mathbf{b}, \mathbf{c}, \mathbf{y} \rightarrow \mathbf{x}\)</span>? Concretely, suppose we
+already have gradients <span class="math notranslate nohighlight">\(\frac{\mathrm{d}\mathcal L}{\mathrm{d}\mathbf{x}}\)</span> of a scalar loss <span class="math notranslate nohighlight">\(\mathcal L\)</span> with respect to the output,
+<span class="math notranslate nohighlight">\(\mathbf{x}\)</span>. How do we then calculate input gradients
+<span class="math notranslate nohighlight">\(\frac{\mathrm{d}\mathcal L}{\mathrm{d}\mathbf{a}}, \frac{\mathrm{d}\mathcal L}{\mathrm{d}\mathbf{b}}, \frac{\mathrm{d}\mathcal L}{\mathrm{d}\mathbf{c}}, \frac{\mathrm{d}\mathcal L}{\mathrm{d}\mathbf{y}}\)</span>?</p>
+<p>If we solve these equations using an algorithm in torch(script) that supports autodiff, we can of course just simply
+backpropagate through each step of the algorithm. This can be done by calling
+<a class="reference internal" href="_autosummary/marinade.gotm.tridiagonal.tridiagonal_solve.html#marinade.gotm.tridiagonal.tridiagonal_solve" title="marinade.gotm.tridiagonal.tridiagonal_solve"><code class="xref py py-func docutils literal notranslate"><span class="pre">tridiagonal_solve()</span></code></a> with <cite>implicit_backward=False</cite>. However, this is quite memory
+inefficient, since it requires us to store all intermediate computations. For some algorithms, calculating gradients
+this way could also be numerically unstable, even when the forward pass is well-behaved.</p>
+<p>We therefore implemented a more efficient approach based on implicit differentiation as a custom torch operation, which
+we derive here. Beginning with <span class="math notranslate nohighlight">\(\frac{\mathrm{d}\mathcal L}{\mathrm{d}\mathbf{y}}\)</span>, we have by the chain rule:</p>
+<div class="math notranslate nohighlight">
+\[\frac{\mathrm{d}\mathcal L}{\mathrm{d}\mathbf{y}} = \frac{\mathrm{d}\mathcal L}{\mathrm{d} \mathbf{x}} \frac{\mathrm{d}\mathbf{x}}{\mathrm{d}\mathbf{y}}\]</div>
+<p>To obtain the unknown r.h.s. factor <span class="math notranslate nohighlight">\(\frac{\mathrm{d}\mathbf{x}}{\mathrm{d}\mathbf{y}}\)</span>, we differentiate both sides of the linear system with respect
+to <span class="math notranslate nohighlight">\(\mathbf{y}\)</span>:</p>
+<div class="math notranslate nohighlight">
+\[\begin{split}\frac{\mathrm{d}}{\mathrm{d}\mathbf{y}}(\mathbf{A}\mathbf{x}) &amp;= \frac{\mathrm{d}}{\mathrm{d}\mathbf{y}}(\mathbf{y}) \\
+\frac{\mathrm{d}\mathbf{x}}{\mathrm{d}\mathbf{y}} &amp;= \mathbf{A}^{-1}\end{split}\]</div>
+<p>substituting this into the chain rule above, we have:</p>
+<div class="math notranslate nohighlight">
+\[\begin{split}\frac{\mathrm{d}\mathcal L}{\mathrm{d}\mathbf{y}} \mathbf{A} &amp;= \frac{\mathrm{d}\mathcal L}{\mathrm{d} \mathbf{x}} \\
+\mathbf{A}^T \frac{\mathrm{d}\mathcal L}{\mathrm{d}\mathbf{y}}^T &amp;= \frac{\mathrm{d}\mathcal L}{\mathrm{d} \mathbf{x}}^T\end{split}\]</div>
+<p>Thus we have a new tridiagonal system with transposed matrix that we can solve for the desired gradients
+<span class="math notranslate nohighlight">\(\frac{\mathrm{d}\mathcal L}{\mathrm{d}\mathbf{y}}^T\)</span>. Note that these gradients are normally defined as row vector (many inputs,
+one output), but here they appear in transposed form as the unknown solution of a tridiagonal system. The r.h.s. vector is
+simply the incoming gradients for the backward pass. We thus solve this system inside the custom
+<cite>~marinade.gotm.tridiagonal.TridiagonalSolve.backward()</cite> method of the
+<a class="reference internal" href="_autosummary/marinade.gotm.tridiagonal.TridiagonalSolve.html#marinade.gotm.tridiagonal.TridiagonalSolve" title="marinade.gotm.tridiagonal.TridiagonalSolve"><code class="xref py py-class docutils literal notranslate"><span class="pre">TridiagonalSolve</span></code></a> class to compute <span class="math notranslate nohighlight">\(\frac{\mathrm{d}\mathcal L}{\mathrm{d}\mathbf{y}}\)</span>.</p>
+<p>To compute <span class="math notranslate nohighlight">\(\frac{\mathrm{d}\mathcal L}{\mathrm{d}\mathbf{b}}\)</span>, we next differentiate the linear system w.r.t. <span class="math notranslate nohighlight">\(b_i\)</span>:</p>
+<div class="math notranslate nohighlight">
+\[\begin{split}\frac{\mathrm{d}}{\mathrm{d}b_i}(\mathbf{A}\mathbf{x}) &amp;= \frac{\mathrm{d}}{\mathrm{d}b_i}(\mathbf{y}) \\
+\frac{\mathrm{d}\mathbf{A}}{\mathrm{d}b_i}\mathbf{x} + \mathbf{A}\frac{\mathrm{d}\mathbf{x}}{\mathrm{d}b_i} &amp;= 0\end{split}\]</div>
+<p>Noting that by the definition of <span class="math notranslate nohighlight">\(\mathbf{A}\)</span> we have <span class="math notranslate nohighlight">\(\frac{\mathrm{d}\mathbf{A}}{\mathrm{d}b_i} = \mathbf{e}_i\mathbf{e}_i^t\)</span>, where <span class="math notranslate nohighlight">\(\mathbf{e}_i\)</span> is the
+<span class="math notranslate nohighlight">\(i\)</span>-th basis vector, we arrive at:</p>
+<div class="math notranslate nohighlight">
+\[\begin{split}\mathbf{A}\frac{\mathrm{d}\mathbf{x}}{\mathrm{d}b_i} &amp;= -x_i \mathbf{e}_i \\
+\frac{\mathrm{d}\mathbf{x}}{\mathrm{d}b_i} &amp;= -x_i \mathbf{A}^{-1} \mathbf{e}_i\end{split}\]</div>
+<p>Substituting this result into chain rule as before, and using the fact derived above that
+<span class="math notranslate nohighlight">\(\frac{\mathrm{d}\mathcal L}{\mathrm{d} \mathbf{x}}=\frac{\mathrm{d}\mathcal L}{\mathrm{d}\mathbf{y}} \mathbf{A}\)</span> gives:</p>
+<div class="math notranslate nohighlight">
+\[\begin{split}\frac{\mathrm{d}\mathcal L}{\mathrm{d}b_i} &amp;= \frac{\mathrm{d}\mathcal L}{\mathrm{d} \mathbf{x}} \frac{\mathrm{d}\mathbf{x}}{\mathrm{d}b_i} \\
+\frac{\mathrm{d}\mathcal L}{\mathrm{d}b_i} &amp;= \left(\frac{\mathrm{d}\mathcal L}{\mathrm{d} \mathbf{y}} \mathbf{A}\right) \left(-x_i \mathbf{A}^{-1} \mathbf{e}_i\right) \\
+\frac{\mathrm{d}\mathcal L}{\mathrm{d}b_i} &amp;= -x_i \left(\frac{\mathrm{d}\mathcal L}{\mathrm{d} \mathbf{y}}\right)_i\end{split}\]</div>
+<p>Combining this result <span class="math notranslate nohighlight">\(\forall i\)</span> yields:</p>
+<div class="math notranslate nohighlight">
+\[\frac{\mathrm{d}\mathcal L}{\mathrm{d}\mathbf{b}} = -\mathbf{x} \otimes \frac{\mathrm{d}\mathcal L}{\mathrm{d} \mathbf{y}}\]</div>
+<p>Where <span class="math notranslate nohighlight">\(\frac{\mathrm{d}\mathcal L}{\mathrm{d} \mathbf{y}}\)</span> has been computed through a linear solve above.</p>
+<p>The same logic can be easily adapted to compute gradients for <span class="math notranslate nohighlight">\(\mathbf{a}\)</span> and <span class="math notranslate nohighlight">\(\mathbf{c}\)</span>. The different location of these
+parameters within <span class="math notranslate nohighlight">\(\mathbf{A}\)</span> gives:</p>
+<div class="math notranslate nohighlight">
+\[\begin{split}\frac{\mathrm{d}\mathbf{A}}{\mathrm{d}a_i} &amp; = \mathbf{e}_{i+1}\mathbf{e}_i^t \\
+\frac{\mathrm{d}\mathbf{A}}{\mathrm{d}c_i} &amp; = \mathbf{e}_{i}\mathbf{e}_{i+1}^t\end{split}\]</div>
+<p>Repeating the same steps as for <span class="math notranslate nohighlight">\(\mathbf{b}\)</span> above, we arrive at:</p>
+<div class="math notranslate nohighlight">
+\[\begin{split}\frac{\mathrm{d}\mathcal L}{\mathrm{d}\mathbf{a}} &amp;= -\mathbf{x}_{1:n-1} \otimes \left(\frac{\mathrm{d}\mathcal L}{\mathrm{d} \mathbf{y}}\right)_{2:n} \\
+\frac{\mathrm{d}\mathcal L}{\mathrm{d}\mathbf{c}} &amp;= -\mathbf{x}_{2:n}   \otimes \left(\frac{\mathrm{d}\mathcal L}{\mathrm{d} \mathbf{y}}\right)_{1:n-1}\end{split}\]</div>
+<p>Where <span class="math notranslate nohighlight">\(\otimes\)</span> denotes elementwise multiplication. Thus, we can carry out backpropagation for <span class="math notranslate nohighlight">\(\mathbf{a},\mathbf{b},\mathbf{c},\mathbf{y}\)</span>
+using only their values and that of <span class="math notranslate nohighlight">\(\mathbf{x}\)</span>, without storing intermediate calculations of the forward solve. In other
+words, only the calculated solution <span class="math notranslate nohighlight">\(\mathbf{x}\)</span> matters, not how we arrive at it. This is the algorithm called by
+<a class="reference internal" href="_autosummary/marinade.gotm.tridiagonal.tridiagonal_solve.html#marinade.gotm.tridiagonal.tridiagonal_solve" title="marinade.gotm.tridiagonal.tridiagonal_solve"><code class="xref py py-func docutils literal notranslate"><span class="pre">tridiagonal_solve()</span></code></a> when <cite>implicit_backward=True</cite>, which is the default setting.</p>
+<p>Note that in the above we have used 1-based indexing as is common in mathematical notation, whereas the actual
+implementation uses 0-based indexing. Additionally, <span class="math notranslate nohighlight">\(\mathbf{a},\mathbf{b},\mathbf{c},\mathbf{y}\)</span> all have a batch dimension. The solver and its
+<a class="reference internal" href="_autosummary/marinade.gotm.tridiagonal.TridiagonalSolve.html#marinade.gotm.tridiagonal.TridiagonalSolve.backward" title="marinade.gotm.tridiagonal.TridiagonalSolve.backward"><code class="xref py py-func docutils literal notranslate"><span class="pre">backward()</span></code></a> method support multiple r.h.s. vectors for each batch element. Variation of <span class="math notranslate nohighlight">\(\mathbf{a},\mathbf{b},\mathbf{c},\mathbf{y}\)</span> across these r.h.s.
+vectors is optional.</p>
+</section>
+<section id="tridiagonal-forward-pass">
+<h1>Tridiagonal Forward Pass<a class="headerlink" href="#tridiagonal-forward-pass" title="Link to this heading">¶</a></h1>
+<p>For forward-mode gradient computation using Jacobian-vector products (JVP), we can employ a similar scheme.
+Assuming knowledge of <span class="math notranslate nohighlight">\(\frac{\mathrm{d}\mathbf{a}}{\mathrm{d}\boldsymbol{\lambda}}, \frac{\mathrm{d}\mathbf{b}}{\mathrm{d}\boldsymbol{\lambda}}, \frac{\mathrm{d}\mathbf{c}}{\mathrm{d}\boldsymbol{\lambda}}, \frac{\mathrm{d}\mathbf{y}}{\mathrm{d}\boldsymbol{\lambda}}\)</span>
+for some parameter <span class="math notranslate nohighlight">\(\boldsymbol{\lambda}\)</span>, we find <span class="math notranslate nohighlight">\(\frac{\mathrm{d}\mathbf{x}}{\mathrm{d}\boldsymbol{\lambda}}\)</span> by the multivariable chain rule.
+Using Einstein summation notation, we find:</p>
+<div class="math notranslate nohighlight">
+\[\frac{\mathrm{d}\mathbf{x}(\mathbf{a},\mathbf{b},\mathbf{c},\mathbf{y})}{\mathrm{d}\boldsymbol{\lambda}}
+= \frac{\mathrm{d}\mathbf{x}}{\mathrm{d} a_i}\frac{\mathrm{d}a_i}{\mathrm{d}\boldsymbol{\lambda}}
++ \frac{\mathrm{d}\mathbf{x}}{\mathrm{d} b_j}\frac{\mathrm{d}b_j}{\mathrm{d}\boldsymbol{\lambda}}
++ \frac{\mathrm{d}\mathbf{x}}{\mathrm{d} c_k}\frac{\mathrm{d}c_k}{\mathrm{d}\boldsymbol{\lambda}}
++ \frac{\mathrm{d}\mathbf{x}}{\mathrm{d} y_l}\frac{\mathrm{d}y_l}{\mathrm{d}\boldsymbol{\lambda}}\]</div>
+<p>With</p>
+<div class="math notranslate nohighlight">
+\[\begin{split}\frac{\mathrm{d}\mathbf{x}}{\mathrm{d}\mathbf{y}} &amp;= \mathbf{A}^{-1}, \\
+\frac{\mathrm{d}\mathbf{x}}{\mathrm{d}b_j} &amp;= -x_j\mathbf{A}^{-1}\mathbf{e}_j, \\
+\frac{\mathrm{d}\mathbf{x}}{\mathrm{d}a_i} &amp;= -\mathbf{A}^{-1}\frac{\mathrm{d}\mathbf{A}}{\mathrm{d}a_i}\mathbf{x} \\
+&amp;= -\mathbf{A}^{-1}\mathbf{e}_{i+1}\mathbf{e}_i^t\mathbf{x} \\
+&amp;= -\mathbf{A}^{-1}\mathbf{e}_{i+1}x_i, \\
+\frac{\mathrm{d}\mathbf{x}}{\mathrm{d}c_k} &amp;= -\mathbf{A}^{-1}\frac{\mathrm{d}\mathbf{A}}{\mathrm{d}c_k}\mathbf{x} \\
+&amp;= -\mathbf{A}^{-1}\mathbf{e}_k\mathbf{e}_{k+1}^t\mathbf{x} \\
+&amp;= -\mathbf{A}^{-1}\mathbf{e}_kx_{k+1}\end{split}\]</div>
+<p>as before, we find</p>
+<div class="math notranslate nohighlight">
+\[\begin{split}\frac{\mathrm{d}\mathbf{x}}{\mathrm{d}\boldsymbol{\lambda}}
+&amp;= -\mathbf{A}^{-1}\mathbf{e}_{i+1}x_i\frac{\mathrm{d}a_i}{\mathrm{d}\boldsymbol{\lambda}}
+- x_j\mathbf{A}^{-1}\mathbf{e}_j\frac{\mathrm{d}b_j}{\mathrm{d}\boldsymbol{\lambda}}
+- \mathbf{A}^{-1}\mathbf{e}_kx_{k+1}\frac{\mathrm{d}c_k}{\mathrm{d}\boldsymbol{\lambda}}
++ \mathbf{A}^{-1}\frac{\mathrm{d}\mathbf{y}}{\mathrm{d}\boldsymbol{\lambda}} \\
+\Rightarrow
+\mathbf{\mathbf{A}}\frac{\mathrm{d}\mathbf{x}}{\mathrm{d}\boldsymbol{\lambda}}
+&amp;= -
+\begin{pmatrix}
+    0 \\
+    \mathbf{x}_{[1:n-1]}\otimes\frac{\mathrm{d}\mathbf{a}}{\mathrm{d}\boldsymbol{\lambda}}
+\end{pmatrix}
+- \mathbf{x}\otimes\frac{\mathrm{d} \mathbf{b}}{\mathrm{d}\boldsymbol{\lambda}}
+- \begin{pmatrix}
+    \mathbf{x}_{[2:n]}\otimes\frac{\mathrm{d}\mathbf{c}}{\mathrm{d}\boldsymbol{\lambda}} \\
+    0
+\end{pmatrix}
++ \frac{\mathrm{d}\mathbf{y}}{\mathrm{d}\boldsymbol{\lambda}}.\end{split}\]</div>
+<p>Again, this system can be solved for <span class="math notranslate nohighlight">\(\frac{\mathrm{d}\mathbf{x}}{\mathrm{d}\boldsymbol{\lambda}}\)</span>.</p>
+<p>Note that in the above we have used 1-based indexing as is common in mathematical notation, whereas the actual
+implementation uses 0-based indexing. Additionally, <span class="math notranslate nohighlight">\(\mathbf{a},\mathbf{b},\mathbf{c},\mathbf{y}\)</span> all have a batch dimension. The solver and its
+<a class="reference internal" href="_autosummary/marinade.gotm.tridiagonal.TridiagonalSolve.html#marinade.gotm.tridiagonal.TridiagonalSolve.jvp" title="marinade.gotm.tridiagonal.TridiagonalSolve.jvp"><code class="xref py py-func docutils literal notranslate"><span class="pre">jvp()</span></code></a> method support multiple r.h.s. vectors for each batch element. Variation of <span class="math notranslate nohighlight">\(\mathbf{a},\mathbf{b},\mathbf{c},\mathbf{y}\)</span> across these r.h.s.
+vectors is optional.</p>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="index.html">
+              <img class="logo" src="_static/m-dml_logo_banner_cropped.png" alt="Logo of MARINADE"/>
+            </a></p>
+<h1 class="logo"><a href="index.html">MARINADE</a></h1>
+
+
+
+
+
+
+
+
+
+<search id="searchbox" style="display: none" role="search">
+    <div class="searchformwrapper">
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Search"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script><h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="index.html">Documentation of MARINADE</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Tridiagonal Backward Pass</a></li>
+<li class="toctree-l1"><a class="reference internal" href="#tridiagonal-forward-pass">Tridiagonal Forward Pass</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="_autosummary/marinade.html">marinade</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="index.html">Documentation overview</a><ul>
+      <li>Previous: <a href="index.html" title="previous chapter">Documentation of MARINADE</a></li>
+      <li>Next: <a href="_autosummary/marinade.html" title="next chapter">marinade</a></li>
+  </ul></li>
+</ul>
+</div>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &#169;2026, m-dml team.
+      
+      |
+      Powered by <a href="https://www.sphinx-doc.org/">Sphinx 9.2.0</a>
+      &amp; <a href="https://alabaster.readthedocs.io">Alabaster 1.0.0</a>
+      
+      |
+      <a href="_sources/backward.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>
