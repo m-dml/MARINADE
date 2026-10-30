@@ -1,3 +1,5 @@
+"""Coupling module for advection, diffusion and BGC integration."""
+
 from typing import Optional, Union
 
 import netCDF4 as nc

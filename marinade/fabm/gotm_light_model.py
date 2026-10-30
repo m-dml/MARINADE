@@ -1,3 +1,5 @@
+"""Light module for GOTM-type simulations."""
+
 from typing import List, Optional, Union
 
 import torch
@@ -13,7 +15,7 @@ class GOTMLightModel(BaseModel):
 
     This model can be coupled to another biomodel through GOTMLightModel.couple(model), see below.
 
-    Some biosystem models require temporal light averages, typically over 24 hours.
+    Some BGC models require temporal light averages, typically over 24 hours.
     These can be computed with this light model with a moving 24 hour time window or as exponential smoothing.
 
     Args:
@@ -94,7 +96,7 @@ class GOTMLightModel(BaseModel):
         self.light_attenuation_background = light_attenuation_background
 
     def couple(self, model: BaseModel):
-        """Couples this light model with another biosystem model.
+        """Couples this light model with another BGC model.
 
         Args:
             model (BaseModel): The model to which this model should be coupled.

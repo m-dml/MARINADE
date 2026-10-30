@@ -1,3 +1,5 @@
+"""Smooth approximations of step functions."""
+
 import torch
 
 

@@ -1,3 +1,5 @@
+"""The BGC model ECOSMO developed by the Nansen center and Hereon."""
+
 from typing import Union
 
 import torch
@@ -7,7 +9,7 @@ from tensordict import TensorDict
 
 
 class NerscEcosmoModel(BioModel):
-    """This class describes the biosystem model ECOSMO developed by the Nansen center and Hereon.
+    """This class describes the BGC model ECOSMO developed by the Nansen center and Hereon.
 
     If created by the constructor method, this model uses the same default parameters as the version of this model
     provided by FABM. A model with custom parameters can be created from a .yaml file with

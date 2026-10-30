@@ -1,3 +1,5 @@
+"""First-, second- and fourth-order explicit numerical integration schemes."""
+
 from typing import Callable, Optional, Union
 
 import torch

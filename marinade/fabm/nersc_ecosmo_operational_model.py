@@ -7,7 +7,7 @@ from tensordict import TensorDict
 
 
 class NerscEcosmoOperationalModel(BioModel):
-    """This class describes the biosystem model ECOSMO developed by the Nansen center.
+    """This class describes the BGC model ECOSMO developed by the Nansen center.
 
     If created by the constructor method, this model uses the same default parameters as the version of this model
     provided by FABM. A model with custom parameters can be created from a .yaml file with

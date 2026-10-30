@@ -1,3 +1,5 @@
+"""Base class for biogeochemical (BGC) models."""
+
 from typing import Union
 
 import torch
@@ -5,7 +7,7 @@ from tensordict import TensorDict
 
 
 class BaseModel:
-    """Base class for biosystem models.
+    """Base class for biogeochemical (BGC) models.
 
     Subclasses should be defined for specific models.
 

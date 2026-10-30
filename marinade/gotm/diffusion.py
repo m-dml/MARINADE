@@ -1,3 +1,5 @@
+"""Implicit or semi-implicit vertical diffusion routines following GOTM numerics."""
+
 from typing import Optional, Union
 
 import torch

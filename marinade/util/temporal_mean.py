@@ -1,9 +1,11 @@
+"""Temporal mean operator based on FABM implementation."""
+
 import torch
 from tensordict import TensorDict
 
 
 class TemporalMean:
-    """Class for keeping track of average values of variables.
+    """Class for keeping track of average values of variables based on FABM implementation.
 
     Each TemporalMean keeps track of one variable / key in a TensorDict specified at initialization.
 
@@ -138,7 +140,7 @@ class TemporalMean:
 
             _bin_end_time = torch.where(mask, _bin_end_time + self.dt_bin, _bin_end_time)
 
-        # --- 2: Add partial last interval (previous_time → time) ---
+        # add partial last interval (previous_time → time)
         dt = time - _previous_time
         scale = torch.where(dt > 0, 0.5 * dt / self.period, 0)
         _history = _history.scatter(
@@ -148,7 +150,7 @@ class TemporalMean:
             + torch.where(dt > 0, scale * (_previous_value + value), 0).unsqueeze(-1),
         )
 
-        # --- 3: Update mean ---
+        # update mean
         if not self.use_incomplete:
             scale = (time - _bin_end_time + self.dt_bin) / self.dt_bin
             _mean = torch.where(

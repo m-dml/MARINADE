@@ -1,3 +1,5 @@
+"""Prototypical BGC model with Nutrients, Phytoplankton, Zooplankton and Detritus (NPZD)."""
+
 from typing import Union
 
 import torch
@@ -7,7 +9,7 @@ from tensordict import TensorDict
 
 
 class GOTMNPZDModel(BioModel):
-    """This class describes a toy biosystem model with four tracers: Nutrients, phytoplankton, zooplankton and
+    """This class describes a prototypical BGC model with four tracers: Nutrients, phytoplankton, zooplankton and
     detritus.
 
     If created by the constructor method, this model uses the same default parameters as the version of this model

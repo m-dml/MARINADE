@@ -1,3 +1,5 @@
+"""BGC model ERGOM by Neumann and Fennel."""
+
 from typing import Union
 
 import torch
@@ -7,7 +9,7 @@ from tensordict import TensorDict
 
 
 class GOTMErgomModel(BioModel):
-    """This class describes the biosystem model ERGOM introduced by Neumann and Fennel.
+    """This class describes the BGC model ERGOM introduced by Neumann and Fennel.
 
     If created by the constructor method, this model uses the same default parameters as the version of this model
     provided by FABM. A model with custom parameters can be created from a .yaml file with

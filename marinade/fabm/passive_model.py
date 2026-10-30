@@ -1,3 +1,5 @@
+"""Model for an inert tracer with constant sinking velocity."""
+
 from typing import Union
 
 import torch
@@ -7,7 +9,7 @@ from tensordict import TensorDict
 
 
 class PassiveModel(BaseModel):
-    """This class provides a very simple biosystem model for an inert tracer.
+    """This class provides a model for an inert tracer.
 
     There are no biogeochemical reactions, the tracer stays conserved and only sinks relative to the water with a
     constant velocity. The sinking velocity is the one model parameter of this class.

@@ -1,3 +1,5 @@
+"""Extended base class for BGC models, introducing routines inspired by FABM."""
+
 from abc import ABC
 from typing import Union
 
@@ -17,7 +19,7 @@ def shared_key_tensordicts(td1: TensorDict, td2: TensorDict):
 
 
 class BioModel(BaseModel, ABC):
-    """Extension of the base class for biosystem models that implements crucial methods for modelling biogeochemical
+    """Extension of the base class for BGC models that implements crucial methods for modelling biogeochemical
     processes.
 
     Subclasses should be defined for specific models. They should implement the following methods:

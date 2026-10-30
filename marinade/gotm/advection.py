@@ -1,3 +1,5 @@
+"""Explicit vertical advection routines supporting various flux limiter schemes following GOTM numerics."""
+
 from typing import Union
 
 import torch
@@ -74,12 +76,12 @@ def advect_at_center(
     r"""Vertical advection of a quantity at the center of the grid cells. This is a reimplementation of the Fortran
     subroutine ADVECT_AT_CENTER from GOTM.
 
-    If _conserve_ == _True_, the 1d conservative advection equation is used:
+    If *conserve* == *True*, the 1d conservative advection equation is used:
 
     .. math::
         \frac{\partial Y}{\partial t} = -\frac{\partial F}{\partial z}
 
-    If _conserve_ == _False_, the 1d non-conservative advection equation is used:
+    If *conserve* == *False*, the 1d non-conservative advection equation is used:
 
     .. math::
         \frac{\partial Y}{\partial t} = -(\frac{\partial F}{\partial z} - Y \frac{\partial w}{\partial z}),

@@ -1,5 +1,5 @@
 
-.. include:: ../../README.rst
+.. include:: ../README.rst
 
 
 --------------------------------------------
@@ -8,7 +8,7 @@ API Reference
 -------------
 
 .. toctree::
-    :maxdepth: 2
+    :maxdepth: 4
     :hidden:
 
     self

@@ -73,5 +73,9 @@ repos:
     rev: 1.6.0
     hooks:
       - id: interrogate
-        args: [-c, "pyproject.toml"]
+        args:
+          - -c
+          - pyproject.toml
+          - --generate-badge
+          - interrogate.svg
         pass_filenames: false
