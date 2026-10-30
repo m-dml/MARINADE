@@ -95,6 +95,7 @@ def cleanup():
     print(f"Cleaning up _autosummary folder in {os.getcwd()}")
     shutil.rmtree(os.path.join(os.getcwd(), "_sources", "_autosummary"))
 
+
 def change_content_of_main_generated_index(app, what, name, obj, options, lines):
     """Add text to the main index page."""
     if what == "module":
