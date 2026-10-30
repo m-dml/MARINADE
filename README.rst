@@ -1,11 +1,9 @@
 .. image:: https://img.shields.io/badge/code%20style-black-000000.svg
     :target: https://github.com/psf/black
 
-.. image:: https://codebase.helmholtz.cloud/m-dml/da-tools/badges/main/pipeline.svg
-    :target: https://codebase.helmholtz.cloud/m-dml/tridiag/pipelines/commits/main
+.. image:: https://raw.githubusercontent.com/m-dml/MARINADE/main/interrogate.svg
 
-.. image:: https://codebase.helmholtz.cloud/m-dml/da-tools/badges/main/coverage.svg
-    :target: https://codebase.helmholtz.cloud/m-dml/tridiag/pipelines/commits/main
+.. image:: https://raw.githubusercontent.com/m-dml/MARINADE/main/pipeline.svg
 
 ====================================
 Documentation of MARINADE
