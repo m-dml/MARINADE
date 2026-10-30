@@ -1,22 +1,12 @@
+# Documentation example with Sphinx
 
-.. include:: ../README.rst
+A small example of how to use Sphinx and MyST 
+to create easily readable and aesthetically pleasing
+documentation.
 
-
---------------------------------------------
-
-API Reference
--------------
-
-.. toctree::
-    :maxdepth: 4
-    :hidden:
-
-    self
-    backward
-
-.. autosummary::
-    :toctree: _autosummary
-    :recursive:
-    :template: custom-module.rst
-
-    marinade
+```{toctree}
+:maxdepth: 2
+:caption: Contents:
+some-feature.md
+another-feature.md
+```
