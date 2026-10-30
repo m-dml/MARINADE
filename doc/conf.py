@@ -9,7 +9,7 @@ import sys
 
 os.environ["PYTORCH_JIT"] = "0"  # disable JIT so that we get docstrings for JIT-ed functions
 
-sys.path.insert(0, os.path.abspath("../../marinade"))
+sys.path.insert(0, os.path.abspath(".."))
 
 # -- Project information -----------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
@@ -61,11 +61,11 @@ autodoc_mock_imports = [
 ]
 
 autodoc_default_options = {
-    # "members": True,
+    #     "members": True,
     "member-order": "groupwise",
-    # "undoc-members": True,
+    #     "undoc-members": True,
     "exclude-members": "__weakref__, __init__",
-    # "show-inheritance": True,
+    #     "show-inheritance": True,
 }
 
 autoclass_content = "class"
