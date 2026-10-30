@@ -1,9 +1,11 @@
 .. image:: https://img.shields.io/badge/code%20style-black-000000.svg
     :target: https://github.com/psf/black
 
-.. image:: https://raw.githubusercontent.com/m-dml/MARINADE/main/interrogate.svg
+.. image:: https://github.com/m-dml/MARINADE/actions/workflows/ci.yml/badge.svg?branch=main
+    :target: https://github.com/m-dml/MARINADE/actions/workflows/ci.yml
 
-.. image:: https://raw.githubusercontent.com/m-dml/MARINADE/main/pipeline.svg
+.. image:: https://github.com/m-dml/MARINADE/actions/workflows/documentation.yml/badge.svg?branch=main
+    :target: https://github.com/m-dml/MARINADE/actions/workflows/documentation.yml
 
 ====================================
 Documentation of MARINADE
