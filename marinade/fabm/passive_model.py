@@ -59,12 +59,16 @@ class PassiveModel(BaseModel):
         """Creates a passive_model instance based on .yaml configuration files.
 
         For this model, the required keys in the gotm yaml file are:
+
         - "grid/nlev": The number of vertical layers.
+
         - "instances/<instance_name>/model": Should be "bb/passive" for the passive model
+
         - "instances/<instance_name>/parameters/vertical_velocity": Sinking velocity
+
         - "instances/<instance_name>/initialization/<tracer_name>": Initial (homogeneous) concentrations for the
-          tracers. The values are not actually used, but the tracer names are stored in *model.tracer_names* and
-          the velocity field is initialized with the tracer dimension equal to the number of tracers.
+        tracers. The values are not actually used, but the tracer names are stored in *model.tracer_names* and
+        the velocity field is initialized with the tracer dimension equal to the number of tracers.
 
         Args:
             path_fabm (str): Path to the FABM .yaml configuration file

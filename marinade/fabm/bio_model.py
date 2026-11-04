@@ -23,10 +23,13 @@ class BioModel(BaseModel, ABC):
     processes.
 
     Subclasses should be defined for specific models. They should implement the following methods:
+
     - *do*: Calculate derivative vector for pelagic tracer concentrations.
+
     - *do_surface*: Optional. Calculate surface derivatives for pelagic tracer concentrations.
+
     - *do_bottom*: Optional. Calculate bottom derivatives for pelagic tracer concentrations and derivatives for
-        benthic fields.
+    benthic fields.
     """
 
     def __init__(self, ode_method, device="cpu", dtype=torch.float64, *args, **kwargs):

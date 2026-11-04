@@ -11,10 +11,37 @@
 Documentation of MARINADE
 ====================================
 
-MARINADE is a set of differentiable re-implementations of diffusion and advection operators from GOTM
-and marine biogeochemical models inspired by FABM.
+MARINADE is a set of differentiable re-implementations of diffusion and advection operators from `GOTM <https://gotm.net/portfolio/>`_
+and marine biogeochemical models inspired by `FABM <https://github.com/fabm-model/fabm/wiki>`_.
 
 Full documentation at https://m-dml.org/MARINADE/
+
+Demonstrations of MARINADE and its support for automatic differentiation can be found in the `notebooks folder <https://github.com/m-dml/MARINADE/tree/main/notebooks>`_.
+For instance, the following illustration from the `sensitivity analysis notebook <https://github.com/m-dml/MARINADE/tree/main/notebooks/sensitivity_analysis_fda_npzd.ipynb>`_ visualizes parameter sensitivities computed with MARINADE-NPZD:
+
+.. image:: https://raw.githubusercontent.com/m-dml/MARINADE/main/sensitivities_NPZD_selection.png
+
+
+MARINADE includes:
+
+* An implicit or semi-implicit vertical diffusion operator using a tridiagonal solver (re-implementation from GOTM with added tridiagonal solver options)
+* An explicit vertical advection operator (re-implementation from GOTM)
+* Re-implementations of biogeochemical (BGC) models:
+
+    - The prototypical NPZD model introduced by `Burchard et al. (2005) <https://doi.org/10.1007/s10236-005-0001-x>`_ (`GitHub <https://github.com/fabm-model/fabm/blob/master/src/models/gotm/npzd.F90>`_)
+    - The FABM version of ERGOM ported by Gennadi Lessin (`GitHub <https://github.com/fabm-model/fabm/blob/master/src/models/gotm/ergom.F90>`_)
+    - ECOSMO II by `Daewel and Schrum (2013) <https://doi.org/10.1016/j.jmarsys.2013.03.008>`_ (without fish)
+    - The GOTM light model (`GitHub <https://github.com/fabm-model/fabm/blob/master/src/models/gotm/light.F90>`_)
+    - As well as an extendable base class for BGC models
+
+* A coupling operator for advection, diffusion and BGC operators
+
+Our example notebooks include (but are not limited to):
+
+* Usage of vertical advection, diffusion and BGC operators (`test_gotm_operators.ipynb <https://github.com/m-dml/MARINADE/tree/main/notebooks/test_gotm_operators.ipynb>`_)
+* Sensitivity analysis and finite difference approximation for NPZD model (`sensitivity_analysis_fda_npzd.ipynb <https://github.com/m-dml/MARINADE/tree/main/notebooks/sensitivity_analysis_fda_npzd.ipynb>`_)
+* Joint state-parameter estimation in observing system simulation experiment with 4D-Var (`4DVar_adda_npzd.ipynb <https://github.com/m-dml/MARINADE/tree/main/notebooks/4DVar_adda_npzd.ipynb>`_)
+
 
 --------------------------------------------
 
@@ -30,53 +57,7 @@ To install you have to clone the repository and install it with pip:
 
 --------------------------------------------
 
-Building this documentation
----------------------------
-To build this documentation, you have to install the requirements in the `docs_environment.yaml` or
-`dev_environment.yaml`. Install `requirements.txt` and MARINADE using `pip`. Then from within the `docs`
-folder, you can build the documentation with:
-
-.. code-block:: bash
-
-   make html
-
-The created documentation can be opened in a browser using the `docs/build/html/index.html` file.
-
-
---------------------------------------------
-
-
-Contributing
-------------
-
-1. Create an issue describing what you want to change/add/remove ...
-2. Create a pull request from that issue. With each pull request, a branch is automatically created.
-3. On your machine switch to that newly created branch of that MR.
-
-    .. code-block:: bash
-
-        git switch branch-name
-
-4. Implement your changes. You can push as many commits as you want to this branch.
-5. As soon as you are done with all changes, make sure that all existing unit-tests pass, and if you implemented something new, make sure it also got a unit-test
-6. Run pre-commit (see below)
-7. Push one more time if the pre-commit run changed your code.
-8. Mark your PR as ready and tell a maintainer that your PR is ready for being reviewed.
-9. If the reviewer is happy, they will merge your code to the main branch. Else you might have to make a few adjustments.
-
-Pre-Commit
-----------
-
-Please install the conda environment in `dev_environment.yaml`. Before you commit, please run
-
-.. code-block:: bash
-
-    pre-commit run --all-files
-
-
-from the main directory to make sure that your code is formatted correctly.
-We use `black` for formatting and `flake8` for linting.
 
 Technical Info
 --------------
-We use a custom backward method for the tridiagonal solve (see documentation).
+We use a custom backward method for the tridiagonal solver used by our implicit diffusion operator (see `documentation <https://m-dml.org/MARINADE/backward.html>`_).
