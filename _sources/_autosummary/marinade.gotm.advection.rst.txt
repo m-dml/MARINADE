@@ -1,0 +1,42 @@
+advection
+=========
+
+
+.. automodule:: marinade.gotm.advection
+
+    
+    
+    
+
+   
+   
+   
+
+   
+   
+   .. rubric:: Functions
+
+   .. autosummary::
+      :toctree:
+      :template: custom-base.rst
+   
+      adv_reconstruct
+      advect_at_center
+   
+   
+
+   
+   
+   .. rubric:: Classes
+
+   .. autosummary::
+      :toctree:
+      :template: custom-class.rst
+   
+      AdvectionOperator
+   
+   
+
+   
+   
+   

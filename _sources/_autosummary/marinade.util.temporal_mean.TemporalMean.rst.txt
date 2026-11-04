@@ -1,0 +1,23 @@
+TemporalMean
+============
+
+.. currentmodule:: marinade.util.temporal_mean
+
+.. autoclass:: TemporalMean
+   :members:
+
+   
+
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+   
+      ~TemporalMean.__init__
+      ~TemporalMean.forward
+   
+   
+
+   
+   
+   

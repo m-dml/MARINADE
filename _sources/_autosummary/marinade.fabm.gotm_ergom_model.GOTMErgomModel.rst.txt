@@ -1,0 +1,39 @@
+GOTMErgomModel
+==============
+
+.. currentmodule:: marinade.fabm.gotm_ergom_model
+
+.. autoclass:: GOTMErgomModel
+   :members:
+
+   
+
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+   
+      ~GOTMErgomModel.__init__
+      ~GOTMErgomModel.create_model_from_yaml_file
+      ~GOTMErgomModel.do
+      ~GOTMErgomModel.do_bottom
+      ~GOTMErgomModel.do_ppdd
+      ~GOTMErgomModel.do_repair_state
+      ~GOTMErgomModel.do_surface
+      ~GOTMErgomModel.forward
+      ~GOTMErgomModel.fpz
+      ~GOTMErgomModel.get_parameters
+      ~GOTMErgomModel.get_vertical_movement
+      ~GOTMErgomModel.osat_weiss
+      ~GOTMErgomModel.right_hand_side_ppdd
+      ~GOTMErgomModel.right_hand_side_rhs
+      ~GOTMErgomModel.setup_internal_fields
+      ~GOTMErgomModel.th
+      ~GOTMErgomModel.update_parameters
+      ~GOTMErgomModel.yy
+   
+   
+
+   
+   
+   

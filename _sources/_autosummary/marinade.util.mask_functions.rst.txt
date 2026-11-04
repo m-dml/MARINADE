@@ -1,0 +1,34 @@
+mask\_functions
+===============
+
+
+.. automodule:: marinade.util.mask_functions
+
+    
+    
+    
+
+   
+   
+   
+
+   
+   
+   .. rubric:: Functions
+
+   .. autosummary::
+      :toctree:
+      :template: custom-base.rst
+   
+      sigmoid_mask
+      smooth_strict_mask
+   
+   
+
+   
+   
+   
+
+   
+   
+   

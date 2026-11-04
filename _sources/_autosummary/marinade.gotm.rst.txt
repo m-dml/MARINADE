@@ -1,0 +1,37 @@
+gotm
+====
+
+
+.. automodule:: marinade.gotm
+
+    
+    
+    .. rubric:: Modules
+
+    .. autosummary::
+       :toctree:
+       :template: custom-module.rst
+       :recursive:
+    
+       advection
+       diffusion
+       gotm
+       tridiagonal
+    
+    
+
+   
+   
+   
+
+   
+   
+   
+
+   
+   
+   
+
+   
+   
+   

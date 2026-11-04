@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>run_gotm &#8212; MARINADE 1.0.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=5ecbeea2" />
+    <link rel="stylesheet" type="text/css" href="../_static/basic.css?v=b08954a9" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css?v=27fed22d" />
+    <script src="../_static/documentation_options.js?v=8d563738"></script>
+    <script src="../_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <link rel="icon" href="../_static/m-dml_logo_dark.png"/>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="TracerSimulationOperator" href="marinade.gotm.gotm.TracerSimulationOperator.html" />
+    <link rel="prev" title="initialize_gotm" href="marinade.gotm.gotm.initialize_gotm.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+
+  
+  
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="run-gotm">
+<h1>run_gotm<a class="headerlink" href="#run-gotm" title="Link to this heading">¶</a></h1>
+<dl class="py function">
+<dt class="sig sig-object py" id="marinade.gotm.gotm.run_gotm">
+<span class="sig-prename descclassname"><span class="pre">marinade.gotm.gotm.</span></span><span class="sig-name descname"><span class="pre">run_gotm</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">gotm_yaml_path</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fabm_yaml_path</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">gotm_nc_path</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">device</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'cpu'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dtype</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'float64'</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">torch.Tensor</span></span></span><a class="reference internal" href="../_modules/marinade/gotm/gotm.html#run_gotm"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#marinade.gotm.gotm.run_gotm" title="Link to this definition">¶</a></dt>
+<dd><p>Set up and run a GOTM-FABM simulation from GOTM/FABM configuration (.yaml) and GOTM-FABM output NetCDF files.</p>
+<p>Computes tracer advection and diffusion given the flow fields from the GOTM simulation.</p>
+<p>May be used for checking consistency with the GOTM-FABM simulation in Fortran.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>gotm_yaml_path</strong> (<em>str</em>) – Path of the gotm.yaml configuration file.</p></li>
+<li><p><strong>fabm_yaml_path</strong> (<em>str</em>) – Path of the fabm.yaml configuration file.</p></li>
+<li><p><strong>gotm_nc_path</strong> (<em>str</em>) – Path of the NetCDF GOTM-FABM output file.</p></li>
+<li><p><strong>device</strong> (<em>str</em><em>, </em><em>optional</em>) – Device for torch computations. Defaults to ‘cpu’.</p></li>
+<li><p><strong>dtype</strong> (<em>str</em><em>, </em><em>optional</em>) – Data type for torch computations. Defaults to ‘float64’.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Simulated tracer fields. [batch, time, tracer, nlev]</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>torch.Tensor</p>
+</dd>
+</dl>
+</dd></dl>
+
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/m-dml_logo_banner_cropped.png" alt="Logo of MARINADE"/>
+            </a></p>
+<h1 class="logo"><a href="../index.html">MARINADE</a></h1>
+
+
+
+
+
+
+
+
+
+<search id="searchbox" style="display: none" role="search">
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Search"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script><h3>Navigation</h3>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../index.html">Documentation of MARINADE</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../backward.html">Tridiagonal Backward Pass</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../backward.html#tridiagonal-forward-pass">Tridiagonal Forward Pass</a></li>
+</ul>
+<ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="marinade.html">marinade</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="marinade.fabm.html">fabm</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="marinade.gotm.html">gotm</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="marinade.gotm.advection.html">advection</a></li>
+<li class="toctree-l3"><a class="reference internal" href="marinade.gotm.diffusion.html">diffusion</a></li>
+<li class="toctree-l3 current"><a class="reference internal" href="marinade.gotm.gotm.html">gotm</a><ul class="current">
+<li class="toctree-l4"><a class="reference internal" href="marinade.gotm.gotm.initialize_gotm.html">initialize_gotm</a></li>
+<li class="toctree-l4 current"><a class="current reference internal" href="#">run_gotm</a><ul>
+<li class="toctree-l5"><a class="reference internal" href="#marinade.gotm.gotm.run_gotm"><code class="docutils literal notranslate"><span class="pre">run_gotm()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l4"><a class="reference internal" href="marinade.gotm.gotm.TracerSimulationOperator.html">TracerSimulationOperator</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="marinade.gotm.tridiagonal.html">tridiagonal</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="marinade.util.html">util</a></li>
+</ul>
+</li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="marinade.html">marinade</a><ul>
+  <li><a href="marinade.gotm.html">gotm</a><ul>
+  <li><a href="marinade.gotm.gotm.html">gotm</a><ul>
+      <li>Previous: <a href="marinade.gotm.gotm.initialize_gotm.html" title="previous chapter">initialize_gotm</a></li>
+      <li>Next: <a href="marinade.gotm.gotm.TracerSimulationOperator.html" title="next chapter">TracerSimulationOperator</a></li>
+  </ul></li>
+  </ul></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &#169;2026, m-dml team.
+      
+      |
+      Powered by <a href="https://www.sphinx-doc.org/">Sphinx 9.2.0</a>
+      &amp; <a href="https://alabaster.readthedocs.io">Alabaster 1.0.0</a>
+      
+      |
+      <a href="../_sources/_autosummary/marinade.gotm.gotm.run_gotm.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

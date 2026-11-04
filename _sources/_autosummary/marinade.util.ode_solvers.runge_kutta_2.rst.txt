@@ -1,0 +1,6 @@
+runge\_kutta\_2
+===============
+
+.. currentmodule:: marinade.util.ode_solvers
+
+.. autofunction:: runge_kutta_2

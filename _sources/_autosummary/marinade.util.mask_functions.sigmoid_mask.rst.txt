@@ -1,0 +1,6 @@
+sigmoid\_mask
+=============
+
+.. currentmodule:: marinade.util.mask_functions
+
+.. autofunction:: sigmoid_mask

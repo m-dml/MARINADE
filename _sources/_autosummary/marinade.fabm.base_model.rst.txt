@@ -1,0 +1,34 @@
+base\_model
+===========
+
+
+.. automodule:: marinade.fabm.base_model
+
+    
+    
+    
+
+   
+   
+   
+
+   
+   
+   
+
+   
+   
+   .. rubric:: Classes
+
+   .. autosummary::
+      :toctree:
+      :template: custom-class.rst
+   
+      BaseModel
+      NPZDModel
+   
+   
+
+   
+   
+   

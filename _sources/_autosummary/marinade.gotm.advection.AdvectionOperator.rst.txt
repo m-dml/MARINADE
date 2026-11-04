@@ -1,0 +1,23 @@
+AdvectionOperator
+=================
+
+.. currentmodule:: marinade.gotm.advection
+
+.. autoclass:: AdvectionOperator
+   :members:
+
+   
+
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+   
+      ~AdvectionOperator.__init__
+      ~AdvectionOperator.forward
+   
+   
+
+   
+   
+   

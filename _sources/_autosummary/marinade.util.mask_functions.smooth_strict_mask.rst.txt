@@ -1,0 +1,6 @@
+smooth\_strict\_mask
+====================
+
+.. currentmodule:: marinade.util.mask_functions
+
+.. autofunction:: smooth_strict_mask

@@ -1,0 +1,6 @@
+initialize\_gotm
+================
+
+.. currentmodule:: marinade.gotm.gotm
+
+.. autofunction:: initialize_gotm

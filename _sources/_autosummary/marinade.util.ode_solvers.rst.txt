@@ -1,0 +1,37 @@
+ode\_solvers
+============
+
+
+.. automodule:: marinade.util.ode_solvers
+
+    
+    
+    
+
+   
+   
+   
+
+   
+   
+   .. rubric:: Functions
+
+   .. autosummary::
+      :toctree:
+      :template: custom-base.rst
+   
+      euler_forward
+      ode_solver
+      partial_add_tensordict
+      runge_kutta_2
+      runge_kutta_4
+   
+   
+
+   
+   
+   
+
+   
+   
+   

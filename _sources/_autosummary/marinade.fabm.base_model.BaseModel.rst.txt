@@ -1,0 +1,28 @@
+BaseModel
+=========
+
+.. currentmodule:: marinade.fabm.base_model
+
+.. autoclass:: BaseModel
+   :members:
+
+   
+
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+   
+      ~BaseModel.__init__
+      ~BaseModel.create_model_from_yaml_file
+      ~BaseModel.do_repair_state
+      ~BaseModel.forward
+      ~BaseModel.get_parameters
+      ~BaseModel.get_vertical_movement
+      ~BaseModel.update_parameters
+   
+   
+
+   
+   
+   

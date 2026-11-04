@@ -1,0 +1,33 @@
+passive\_model
+==============
+
+
+.. automodule:: marinade.fabm.passive_model
+
+    
+    
+    
+
+   
+   
+   
+
+   
+   
+   
+
+   
+   
+   .. rubric:: Classes
+
+   .. autosummary::
+      :toctree:
+      :template: custom-class.rst
+   
+      PassiveModel
+   
+   
+
+   
+   
+   

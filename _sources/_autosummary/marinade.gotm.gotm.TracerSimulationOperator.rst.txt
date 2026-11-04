@@ -1,0 +1,24 @@
+TracerSimulationOperator
+========================
+
+.. currentmodule:: marinade.gotm.gotm
+
+.. autoclass:: TracerSimulationOperator
+   :members:
+
+   
+
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+   
+      ~TracerSimulationOperator.__init__
+      ~TracerSimulationOperator.forward
+      ~TracerSimulationOperator.integrate
+   
+   
+
+   
+   
+   

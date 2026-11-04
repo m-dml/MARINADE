@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="./">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Documentation of MARINADE &#8212; MARINADE 1.0.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=5ecbeea2" />
+    <link rel="stylesheet" type="text/css" href="_static/basic.css?v=b08954a9" />
+    <link rel="stylesheet" type="text/css" href="_static/alabaster.css?v=27fed22d" />
+    <script src="_static/documentation_options.js?v=8d563738"></script>
+    <script src="_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <link rel="icon" href="_static/m-dml_logo_dark.png"/>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Tridiagonal Backward Pass" href="backward.html" />
+   
+  <link rel="stylesheet" href="_static/custom.css" type="text/css" />
+  
+
+  
+  
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <a class="reference external image-reference" href="https://github.com/psf/black"><img alt="https://img.shields.io/badge/code%20style-black-000000.svg" src="https://img.shields.io/badge/code%20style-black-000000.svg" />
+</a>
+<a class="reference external image-reference" href="https://github.com/m-dml/MARINADE/actions/workflows/ci.yml"><img alt="https://github.com/m-dml/MARINADE/actions/workflows/ci.yml/badge.svg?branch=main" src="https://github.com/m-dml/MARINADE/actions/workflows/ci.yml/badge.svg?branch=main" />
+</a>
+<a class="reference external image-reference" href="https://github.com/m-dml/MARINADE/actions/workflows/documentation.yml"><img alt="https://github.com/m-dml/MARINADE/actions/workflows/documentation.yml/badge.svg?branch=main" src="https://github.com/m-dml/MARINADE/actions/workflows/documentation.yml/badge.svg?branch=main" />
+</a>
+<section id="documentation-of-marinade">
+<h1>Documentation of MARINADE<a class="headerlink" href="#documentation-of-marinade" title="Link to this heading">¶</a></h1>
+<p>MARINADE is a set of differentiable re-implementations of diffusion and advection operators from <a class="reference external" href="https://gotm.net/portfolio/">GOTM</a>
+and marine biogeochemical models inspired by <a class="reference external" href="https://github.com/fabm-model/fabm/wiki">FABM</a>.</p>
+<p>Full documentation at <a class="reference external" href="https://m-dml.org/MARINADE/">https://m-dml.org/MARINADE/</a></p>
+<p>Demonstrations of MARINADE and its support for automatic differentiation can be found in the <a class="reference external" href="https://github.com/m-dml/MARINADE/tree/main/notebooks">notebooks folder</a>.
+For instance, the following illustration from the <a class="reference external" href="https://github.com/m-dml/MARINADE/tree/main/notebooks/sensitivity_analysis_fda_npzd.ipynb">sensitivity analysis notebook</a> visualizes parameter sensitivities computed with MARINADE-NPZD:</p>
+<img alt="https://raw.githubusercontent.com/m-dml/MARINADE/main/sensitivities_NPZD_selection.png" src="https://raw.githubusercontent.com/m-dml/MARINADE/main/sensitivities_NPZD_selection.png" />
+<p>MARINADE includes:</p>
+<ul>
+<li><p>An implicit or semi-implicit vertical diffusion operator using a tridiagonal solver (re-implementation from GOTM with added tridiagonal solver options)</p></li>
+<li><p>An explicit vertical advection operator (re-implementation from GOTM)</p></li>
+<li><p>Re-implementations of biogeochemical (BGC) models:</p>
+<blockquote>
+<div><ul class="simple">
+<li><p>The prototypical NPZD model introduced by <a class="reference external" href="https://doi.org/10.1007/s10236-005-0001-x">Burchard et al. (2005)</a> (<a class="reference external" href="https://github.com/fabm-model/fabm/blob/master/src/models/gotm/npzd.F90">GitHub</a>)</p></li>
+<li><p>The FABM version of ERGOM ported by Gennadi Lessin (<a class="reference external" href="https://github.com/fabm-model/fabm/blob/master/src/models/gotm/ergom.F90">GitHub</a>)</p></li>
+<li><p>ECOSMO II by <a class="reference external" href="https://doi.org/10.1016/j.jmarsys.2013.03.008">Daewel and Schrum (2013)</a> (without fish)</p></li>
+<li><p>The GOTM light model (<a class="reference external" href="https://github.com/fabm-model/fabm/blob/master/src/models/gotm/light.F90">GitHub</a>)</p></li>
+<li><p>As well as an extendable base class for BGC models</p></li>
+</ul>
+</div></blockquote>
+</li>
+<li><p>A coupling operator for advection, diffusion and BGC operators</p></li>
+</ul>
+<p>Our example notebooks include (but are not limited to):</p>
+<ul class="simple">
+<li><p>Usage of vertical advection, diffusion and BGC operators (<a class="reference external" href="https://github.com/m-dml/MARINADE/tree/main/notebooks/test_gotm_operators.ipynb">test_gotm_operators.ipynb</a>)</p></li>
+<li><p>Sensitivity analysis and finite difference approximation for NPZD model (<a class="reference external" href="https://github.com/m-dml/MARINADE/tree/main/notebooks/sensitivity_analysis_fda_npzd.ipynb">sensitivity_analysis_fda_npzd.ipynb</a>)</p></li>
+<li><p>Joint state-parameter estimation in observing system simulation experiment with 4D-Var (<a class="reference external" href="https://github.com/m-dml/MARINADE/tree/main/notebooks/4DVar_adda_npzd.ipynb">4DVar_adda_npzd.ipynb</a>)</p></li>
+</ul>
+<hr class="docutils" />
+<section id="installation">
+<h2>Installation<a class="headerlink" href="#installation" title="Link to this heading">¶</a></h2>
+<p>To install you have to clone the repository and install it with pip:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>git<span class="w"> </span>clone<span class="w"> </span>https://github.com/m-dml/MARINADE
+<span class="nb">cd</span><span class="w"> </span>MARINADE
+pip<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </span>.
+</pre></div>
+</div>
+</section>
+<hr class="docutils" />
+<section id="technical-info">
+<h2>Technical Info<a class="headerlink" href="#technical-info" title="Link to this heading">¶</a></h2>
+<p>We use a custom backward method for the tridiagonal solver used by our implicit diffusion operator (see <a class="reference external" href="https://m-dml.org/MARINADE/backward.html">documentation</a>).</p>
+</section>
+<hr class="docutils" />
+<section id="api-reference">
+<h2>API Reference<a class="headerlink" href="#api-reference" title="Link to this heading">¶</a></h2>
+<div class="toctree-wrapper compound">
+</div>
+<table class="autosummary longtable docutils align-default">
+<tbody>
+<tr class="row-odd"><td><p><a class="reference internal" href="_autosummary/marinade.html#module-marinade" title="marinade"><code class="xref py py-obj docutils literal notranslate"><span class="pre">marinade</span></code></a></p></td>
+<td><p>API reference for MARINADE.</p></td>
+</tr>
+</tbody>
+</table>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="#">
+              <img class="logo" src="_static/m-dml_logo_banner_cropped.png" alt="Logo of MARINADE"/>
+            </a></p>
+<h1 class="logo"><a href="#">MARINADE</a></h1>
+
+
+
+
+
+
+
+
+
+<search id="searchbox" style="display: none" role="search">
+    <div class="searchformwrapper">
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Search"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script><h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Documentation of MARINADE</a></li>
+<li class="toctree-l1"><a class="reference internal" href="backward.html">Tridiagonal Backward Pass</a></li>
+<li class="toctree-l1"><a class="reference internal" href="backward.html#tridiagonal-forward-pass">Tridiagonal Forward Pass</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="_autosummary/marinade.html">marinade</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="#">Documentation overview</a><ul>
+      <li>Next: <a href="backward.html" title="next chapter">Tridiagonal Backward Pass</a></li>
+  </ul></li>
+</ul>
+</div>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &#169;2026, m-dml team.
+      
+      |
+      Powered by <a href="https://www.sphinx-doc.org/">Sphinx 9.2.0</a>
+      &amp; <a href="https://alabaster.readthedocs.io">Alabaster 1.0.0</a>
+      
+      |
+      <a href="_sources/index.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

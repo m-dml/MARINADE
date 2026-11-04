@@ -1,0 +1,6 @@
+tridiagonal\_solve\_scipy
+=========================
+
+.. currentmodule:: marinade.gotm.tridiagonal
+
+.. autofunction:: tridiagonal_solve_scipy

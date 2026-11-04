@@ -1,0 +1,6 @@
+ode\_solver
+===========
+
+.. currentmodule:: marinade.util.ode_solvers
+
+.. autofunction:: ode_solver

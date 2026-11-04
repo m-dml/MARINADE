@@ -1,0 +1,31 @@
+GOTMLightModel
+==============
+
+.. currentmodule:: marinade.fabm.gotm_light_model
+
+.. autoclass:: GOTMLightModel
+   :members:
+
+   
+
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+   
+      ~GOTMLightModel.__init__
+      ~GOTMLightModel.compute_light
+      ~GOTMLightModel.couple
+      ~GOTMLightModel.create_model_from_yaml_file
+      ~GOTMLightModel.do_repair_state
+      ~GOTMLightModel.forward
+      ~GOTMLightModel.get_parameters
+      ~GOTMLightModel.get_vertical_movement
+      ~GOTMLightModel.register_light_coupling
+      ~GOTMLightModel.update_parameters
+   
+   
+
+   
+   
+   

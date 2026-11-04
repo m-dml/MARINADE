@@ -1,0 +1,34 @@
+GOTMNPZDModel
+=============
+
+.. currentmodule:: marinade.fabm.gotm_npzd_model
+
+.. autoclass:: GOTMNPZDModel
+   :members:
+
+   
+
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+   
+      ~GOTMNPZDModel.__init__
+      ~GOTMNPZDModel.create_model_from_yaml_file
+      ~GOTMNPZDModel.do
+      ~GOTMNPZDModel.do_ppdd
+      ~GOTMNPZDModel.do_repair_state
+      ~GOTMNPZDModel.fnp
+      ~GOTMNPZDModel.forward
+      ~GOTMNPZDModel.fpz
+      ~GOTMNPZDModel.get_parameters
+      ~GOTMNPZDModel.get_vertical_movement
+      ~GOTMNPZDModel.right_hand_side_ppdd
+      ~GOTMNPZDModel.right_hand_side_rhs
+      ~GOTMNPZDModel.update_parameters
+   
+   
+
+   
+   
+   

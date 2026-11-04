@@ -1,0 +1,43 @@
+diffusion
+=========
+
+
+.. automodule:: marinade.gotm.diffusion
+
+    
+    
+    
+
+   
+   
+   
+
+   
+   
+   .. rubric:: Functions
+
+   .. autosummary::
+      :toctree:
+      :template: custom-base.rst
+   
+      diffuse_at_center
+      setup_boundary
+      setup_tridiagonal_matrix
+   
+   
+
+   
+   
+   .. rubric:: Classes
+
+   .. autosummary::
+      :toctree:
+      :template: custom-class.rst
+   
+      DiffusionOperator
+   
+   
+
+   
+   
+   

@@ -1,0 +1,6 @@
+run\_gotm
+=========
+
+.. currentmodule:: marinade.gotm.gotm
+
+.. autofunction:: run_gotm

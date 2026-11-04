@@ -1,0 +1,6 @@
+setup\_tridiagonal\_matrix
+==========================
+
+.. currentmodule:: marinade.gotm.diffusion
+
+.. autofunction:: setup_tridiagonal_matrix

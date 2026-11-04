@@ -1,0 +1,6 @@
+tridiagonal\_solve\_paracr
+==========================
+
+.. currentmodule:: marinade.gotm.tridiagonal
+
+.. autofunction:: tridiagonal_solve_paracr

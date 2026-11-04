@@ -1,0 +1,6 @@
+partial\_add\_tensordict
+========================
+
+.. currentmodule:: marinade.util.ode_solvers
+
+.. autofunction:: partial_add_tensordict

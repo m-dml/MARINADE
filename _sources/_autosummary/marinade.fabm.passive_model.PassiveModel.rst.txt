@@ -1,0 +1,28 @@
+PassiveModel
+============
+
+.. currentmodule:: marinade.fabm.passive_model
+
+.. autoclass:: PassiveModel
+   :members:
+
+   
+
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+   
+      ~PassiveModel.__init__
+      ~PassiveModel.create_model_from_yaml_file
+      ~PassiveModel.do_repair_state
+      ~PassiveModel.forward
+      ~PassiveModel.get_parameters
+      ~PassiveModel.get_vertical_movement
+      ~PassiveModel.update_parameters
+   
+   
+
+   
+   
+   

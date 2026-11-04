@@ -1,0 +1,33 @@
+temporal\_mean
+==============
+
+
+.. automodule:: marinade.util.temporal_mean
+
+    
+    
+    
+
+   
+   
+   
+
+   
+   
+   
+
+   
+   
+   .. rubric:: Classes
+
+   .. autosummary::
+      :toctree:
+      :template: custom-class.rst
+   
+      TemporalMean
+   
+   
+
+   
+   
+   

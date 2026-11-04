@@ -1,0 +1,42 @@
+gotm
+====
+
+
+.. automodule:: marinade.gotm.gotm
+
+    
+    
+    
+
+   
+   
+   
+
+   
+   
+   .. rubric:: Functions
+
+   .. autosummary::
+      :toctree:
+      :template: custom-base.rst
+   
+      initialize_gotm
+      run_gotm
+   
+   
+
+   
+   
+   .. rubric:: Classes
+
+   .. autosummary::
+      :toctree:
+      :template: custom-class.rst
+   
+      TracerSimulationOperator
+   
+   
+
+   
+   
+   

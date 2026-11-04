@@ -1,0 +1,45 @@
+tridiagonal
+===========
+
+
+.. automodule:: marinade.gotm.tridiagonal
+
+    
+    
+    
+
+   
+   
+   
+
+   
+   
+   .. rubric:: Functions
+
+   .. autosummary::
+      :toctree:
+      :template: custom-base.rst
+   
+      random_tridiag_dd
+      tridiagonal_solve
+      tridiagonal_solve_linalg
+      tridiagonal_solve_paracr
+      tridiagonal_solve_scipy
+   
+   
+
+   
+   
+   .. rubric:: Classes
+
+   .. autosummary::
+      :toctree:
+      :template: custom-class.rst
+   
+      TridiagonalSolve
+   
+   
+
+   
+   
+   

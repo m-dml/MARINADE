@@ -1,0 +1,691 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../../../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>marinade.gotm.gotm &#8212; MARINADE 1.0.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=5ecbeea2" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/basic.css?v=b08954a9" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/alabaster.css?v=27fed22d" />
+    <script src="../../../_static/documentation_options.js?v=8d563738"></script>
+    <script src="../../../_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <link rel="icon" href="../../../_static/m-dml_logo_dark.png"/>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" />
+   
+  <link rel="stylesheet" href="../../../_static/custom.css" type="text/css" />
+  
+
+  
+  
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <h1>Source code for marinade.gotm.gotm</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;Coupling module for advection, diffusion and BGC integration.&quot;&quot;&quot;</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Union</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">netCDF4</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">nc</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">yaml</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">marinade.fabm.base_model</span><span class="w"> </span><span class="kn">import</span> <span class="n">BaseModel</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">marinade.fabm.passive_model</span><span class="w"> </span><span class="kn">import</span> <span class="n">PassiveModel</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">marinade.gotm.advection</span><span class="w"> </span><span class="kn">import</span> <span class="n">AdvectionOperator</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">marinade.gotm.diffusion</span><span class="w"> </span><span class="kn">import</span> <span class="n">DiffusionOperator</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">tensordict</span><span class="w"> </span><span class="kn">import</span> <span class="n">TensorDict</span>
+
+
+<div class="viewcode-block" id="initialize_gotm">
+<a class="viewcode-back" href="../../../_autosummary/marinade.gotm.gotm.initialize_gotm.html#marinade.gotm.gotm.initialize_gotm">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">initialize_gotm</span><span class="p">(</span>
+    <span class="n">gotm_yaml_path</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;gotm.yaml&quot;</span><span class="p">,</span>
+    <span class="n">fabm_yaml_path</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;fabm.yaml&quot;</span><span class="p">,</span>
+    <span class="n">gotm_nc_path</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;output.nc&quot;</span><span class="p">,</span>
+    <span class="n">model_classes</span><span class="o">=</span><span class="p">[],</span>
+    <span class="n">model_arguments</span><span class="p">:</span> <span class="nb">list</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">fields</span><span class="o">=</span><span class="p">[],</span>
+    <span class="n">device</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;cpu&quot;</span><span class="p">,</span>
+    <span class="n">dtype</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;float64&quot;</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Setup GOTM-FABM tracer transport simulation from configuration and output files. Currently assumes that a</span>
+<span class="sd">    PassiveModel with a constant sinking velocity is used.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        gotm_yaml_path (str, optional): Path to the GOTM configuration file. Defaults to &#39;gotm.yaml&#39;.</span>
+<span class="sd">        fabm_yaml_path (str, optional): Path to the FABM configuration file. Defaults to &#39;fabm.yaml&#39;.</span>
+<span class="sd">        gotm_nc_path (str, optional): Path to the GOTM/FABM NetCDF output. Defaults to &#39;output.nc&#39;.</span>
+<span class="sd">        model_classes (list, optional): List of classes that should be initialized from the .yaml files.</span>
+<span class="sd">            Defaults to [].</span>
+<span class="sd">        model_arguments (list of dicts, optional): Arguments for the models. If provided, has to contain as many</span>
+<span class="sd">            dicts as model classes. Defaults to None.</span>
+<span class="sd">        fields (list, optional): List of fields to be extracted from the dataset. Defaults to [].</span>
+<span class="sd">        device (str, optional): The device where the tensors should be created. Defaults to &#39;cpu&#39;.</span>
+<span class="sd">        dtype (str, optional): The data type of the tensors to be created. Defaults to &#39;float64&#39;.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        dict: Dict with the NPZD model, lists and tensors required for integrate_gotm().</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">dtype_class</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">torch</span><span class="p">,</span> <span class="n">dtype</span><span class="p">)</span>  <span class="c1"># should give e.g. torch.float64</span>
+
+    <span class="k">if</span> <span class="n">model_arguments</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">model_arguments</span> <span class="o">=</span> <span class="p">[</span><span class="nb">dict</span><span class="p">()</span> <span class="k">for</span> <span class="n">m</span> <span class="ow">in</span> <span class="n">model_classes</span><span class="p">]</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">assert</span> <span class="nb">len</span><span class="p">(</span><span class="n">model_classes</span><span class="p">)</span> <span class="o">==</span> <span class="nb">len</span><span class="p">(</span><span class="n">model_arguments</span><span class="p">),</span> <span class="s2">&quot;Provide either no arguments or as many as model classes&quot;</span>
+        <span class="k">for</span> <span class="n">arg_dict</span> <span class="ow">in</span> <span class="n">model_arguments</span><span class="p">:</span>
+            <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">arg_dict</span><span class="p">,</span> <span class="nb">dict</span><span class="p">),</span> <span class="s2">&quot;Provide either no arguments or one argument dict per model class&quot;</span>
+
+    <span class="c1"># Load the config files and save number of levels and advection scheme:</span>
+    <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">gotm_yaml_path</span><span class="p">,</span> <span class="s2">&quot;r&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">file_gotm</span><span class="p">:</span>
+        <span class="n">config_gotm</span> <span class="o">=</span> <span class="n">yaml</span><span class="o">.</span><span class="n">safe_load</span><span class="p">(</span><span class="n">file_gotm</span><span class="p">)</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">dt</span> <span class="o">=</span> <span class="n">config_gotm</span><span class="p">[</span><span class="s2">&quot;time&quot;</span><span class="p">][</span><span class="s2">&quot;dt&quot;</span><span class="p">]</span>
+            <span class="k">if</span> <span class="n">dt</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">dt</span><span class="p">,</span> <span class="p">(</span><span class="nb">int</span><span class="p">,</span> <span class="nb">float</span><span class="p">)):</span>  <span class="c1"># sanity check</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Invalid dt&quot;</span><span class="p">)</span>
+            <span class="n">dt</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="n">dt</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype_class</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">)</span>
+        <span class="k">except</span> <span class="p">(</span><span class="ne">KeyError</span><span class="p">,</span> <span class="ne">ValueError</span><span class="p">,</span> <span class="ne">TypeError</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;time/dt key does not exist or is invalid in </span><span class="si">{</span><span class="n">gotm_yaml_path</span><span class="si">}</span><span class="s2">! &quot;</span>
+                <span class="o">+</span> <span class="s2">&quot;Please specify a time step of type float or int.&quot;</span>
+            <span class="p">)</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">nlev</span> <span class="o">=</span> <span class="n">config_gotm</span><span class="p">[</span><span class="s2">&quot;grid&quot;</span><span class="p">][</span><span class="s2">&quot;nlev&quot;</span><span class="p">]</span>
+            <span class="k">if</span> <span class="n">nlev</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">nlev</span><span class="p">,</span> <span class="nb">int</span><span class="p">):</span>  <span class="c1"># sanity check</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Invalid nlev&quot;</span><span class="p">)</span>
+        <span class="k">except</span> <span class="p">(</span><span class="ne">KeyError</span><span class="p">,</span> <span class="ne">ValueError</span><span class="p">,</span> <span class="ne">TypeError</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;grid/nlev key does not exist or is invalid in </span><span class="si">{</span><span class="n">gotm_yaml_path</span><span class="si">}</span><span class="s2">! &quot;</span>
+                <span class="o">+</span> <span class="s2">&quot;Please specify a number of vertical layers as positive int.&quot;</span>
+            <span class="p">)</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">scheme</span> <span class="o">=</span> <span class="n">config_gotm</span><span class="p">[</span><span class="s2">&quot;fabm&quot;</span><span class="p">][</span><span class="s2">&quot;numerics&quot;</span><span class="p">][</span><span class="s2">&quot;w_adv_discr&quot;</span><span class="p">]</span>
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">scheme</span><span class="p">,</span> <span class="nb">int</span><span class="p">):</span>  <span class="c1"># provide compatibility with Deborah&#39;s version of GOTM</span>
+                <span class="n">_dict</span> <span class="o">=</span> <span class="p">{</span><span class="mi">1</span><span class="p">:</span> <span class="s2">&quot;upstream&quot;</span><span class="p">,</span> <span class="mi">3</span><span class="p">:</span> <span class="s2">&quot;p2&quot;</span><span class="p">,</span> <span class="mi">4</span><span class="p">:</span> <span class="s2">&quot;superbee&quot;</span><span class="p">,</span> <span class="mi">5</span><span class="p">:</span> <span class="s2">&quot;muscl&quot;</span><span class="p">,</span> <span class="mi">6</span><span class="p">:</span> <span class="s2">&quot;p2_pdm&quot;</span><span class="p">}</span>
+                <span class="n">scheme</span> <span class="o">=</span> <span class="n">_dict</span><span class="p">[</span><span class="n">scheme</span><span class="p">]</span>
+            <span class="k">if</span> <span class="n">scheme</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">&quot;upstream&quot;</span><span class="p">,</span> <span class="s2">&quot;p2&quot;</span><span class="p">,</span> <span class="s2">&quot;superbee&quot;</span><span class="p">,</span> <span class="s2">&quot;muscl&quot;</span><span class="p">,</span> <span class="s2">&quot;p2_pdm&quot;</span><span class="p">):</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;Invalid advection limiter scheme in </span><span class="si">{</span><span class="n">gotm_yaml_path</span><span class="si">}</span><span class="s2">! &quot;</span>
+                    <span class="o">+</span> <span class="s2">&quot;Please specify fabm/numerics/w_adv_discr as one of the following: &quot;</span>
+                    <span class="o">+</span> <span class="s1">&#39;(&quot;upstream&quot;, &quot;p2&quot;, &quot;superbee&quot;, &quot;muscl&quot;, &quot;p2_pdm&quot;)&#39;</span>
+                <span class="p">)</span>
+        <span class="k">except</span> <span class="p">(</span><span class="ne">KeyError</span><span class="p">,</span> <span class="ne">ValueError</span><span class="p">,</span> <span class="ne">TypeError</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;Invalid advection limiter scheme in </span><span class="si">{</span><span class="n">gotm_yaml_path</span><span class="si">}</span><span class="s2">! &quot;</span>
+                <span class="o">+</span> <span class="s2">&quot;Please specify fabm/numerics/w_adv_discr as one of the following: &quot;</span>
+                <span class="o">+</span> <span class="s1">&#39;(&quot;upstream&quot;, &quot;p2&quot;, &quot;superbee&quot;, &quot;muscl&quot;, &quot;p2_pdm&quot;)&#39;</span>
+            <span class="p">)</span>
+        <span class="n">dilution</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="n">freshwater_impact</span> <span class="o">=</span> <span class="kc">False</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">freshwater_impact</span> <span class="o">=</span> <span class="n">config_gotm</span><span class="p">[</span><span class="s2">&quot;fabm&quot;</span><span class="p">][</span><span class="s2">&quot;freshwater_impact&quot;</span><span class="p">]</span>
+        <span class="k">except</span> <span class="p">(</span><span class="ne">KeyError</span><span class="p">,</span> <span class="ne">ValueError</span><span class="p">,</span> <span class="ne">TypeError</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;Invalid freshwater impact specification in </span><span class="si">{</span><span class="n">gotm_yaml_path</span><span class="si">}</span><span class="s2">! &quot;</span>
+                <span class="o">+</span> <span class="s2">&quot;Please specify fabm/freshwater_impact as true or false&quot;</span>
+            <span class="p">)</span>
+
+    <span class="c1"># Create the NPZD model from the files:</span>
+    <span class="n">models</span> <span class="o">=</span> <span class="p">[</span>
+        <span class="n">model_class</span><span class="o">.</span><span class="n">create_model_from_yaml_file</span><span class="p">(</span>
+            <span class="n">path_fabm</span><span class="o">=</span><span class="n">fabm_yaml_path</span><span class="p">,</span> <span class="n">path_gotm</span><span class="o">=</span><span class="n">gotm_yaml_path</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype_class</span><span class="p">,</span> <span class="o">**</span><span class="n">args</span>
+        <span class="p">)</span>
+        <span class="k">for</span> <span class="n">model_class</span><span class="p">,</span> <span class="n">args</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">model_classes</span><span class="p">,</span> <span class="n">model_arguments</span><span class="p">)</span>
+    <span class="p">]</span>
+
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">model</span> <span class="o">=</span> <span class="n">PassiveModel</span><span class="o">.</span><span class="n">create_model_from_yaml_file</span><span class="p">(</span>
+            <span class="n">path_fabm</span><span class="o">=</span><span class="n">fabm_yaml_path</span><span class="p">,</span> <span class="n">path_gotm</span><span class="o">=</span><span class="n">gotm_yaml_path</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype_class</span>
+        <span class="p">)</span>
+    <span class="k">except</span> <span class="p">(</span><span class="ne">ValueError</span><span class="p">,</span> <span class="ne">AttributeError</span><span class="p">,</span> <span class="ne">IndexError</span><span class="p">):</span>
+        <span class="n">model</span> <span class="o">=</span> <span class="kc">None</span>
+
+    <span class="n">ds</span> <span class="o">=</span> <span class="n">nc</span><span class="o">.</span><span class="n">Dataset</span><span class="p">(</span><span class="n">gotm_nc_path</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">)</span>  <span class="c1"># load the GOTM output dataset</span>
+
+    <span class="c1"># The dimensions. Important for plotting the results.</span>
+    <span class="n">t</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">from_numpy</span><span class="p">(</span><span class="n">ds</span><span class="p">[</span><span class="s2">&quot;time&quot;</span><span class="p">][:])</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">dtype</span><span class="o">=</span><span class="n">dtype_class</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">)</span>
+    <span class="n">z</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">from_numpy</span><span class="p">(</span><span class="n">ds</span><span class="p">[</span><span class="s2">&quot;z&quot;</span><span class="p">][:]</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">squeeze</span><span class="p">()[:])</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">dtype</span><span class="o">=</span><span class="n">dtype_class</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">)</span>
+    <span class="n">zi</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">from_numpy</span><span class="p">(</span><span class="n">ds</span><span class="p">[</span><span class="s2">&quot;zi&quot;</span><span class="p">][:]</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">squeeze</span><span class="p">()[:])</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">dtype</span><span class="o">=</span><span class="n">dtype_class</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">)</span>
+
+    <span class="n">h</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="n">torch</span><span class="o">.</span><span class="n">from_numpy</span><span class="p">(</span><span class="n">ds</span><span class="p">[</span><span class="s2">&quot;h&quot;</span><span class="p">][:]</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">squeeze</span><span class="p">())</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">dtype</span><span class="o">=</span><span class="n">dtype_class</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">)</span><span class="o">.</span><span class="n">unsqueeze</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span><span class="o">.</span><span class="n">unsqueeze_</span><span class="p">(</span><span class="o">-</span><span class="mi">2</span><span class="p">)</span>
+    <span class="p">)</span>  <span class="c1"># shape (1 (batch), t, 1 (tracer), z)</span>
+    <span class="n">nuh</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="n">torch</span><span class="o">.</span><span class="n">from_numpy</span><span class="p">(</span><span class="n">ds</span><span class="p">[</span><span class="s2">&quot;nuh&quot;</span><span class="p">][:]</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">squeeze</span><span class="p">())</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">dtype</span><span class="o">=</span><span class="n">dtype_class</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">)</span><span class="o">.</span><span class="n">unsqueeze</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span><span class="o">.</span><span class="n">unsqueeze_</span><span class="p">(</span><span class="o">-</span><span class="mi">2</span><span class="p">)</span>
+    <span class="p">)</span>  <span class="c1"># shape (1 (batch), t, 1 (tracer), z)</span>
+
+    <span class="c1"># read precipitation and evaporation if enabled</span>
+    <span class="k">if</span> <span class="n">freshwater_impact</span><span class="p">:</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">precip</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">from_numpy</span><span class="p">(</span><span class="n">ds</span><span class="p">[</span><span class="s2">&quot;precip&quot;</span><span class="p">][:]</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">squeeze</span><span class="p">()[:])</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">dtype</span><span class="o">=</span><span class="n">dtype_class</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">)</span>
+            <span class="n">evap</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">from_numpy</span><span class="p">(</span><span class="n">ds</span><span class="p">[</span><span class="s2">&quot;evap&quot;</span><span class="p">][:]</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">squeeze</span><span class="p">()[:])</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">dtype</span><span class="o">=</span><span class="n">dtype_class</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">)</span>
+            <span class="n">dilution</span> <span class="o">=</span> <span class="p">(</span><span class="n">precip</span> <span class="o">+</span> <span class="n">evap</span><span class="p">)</span><span class="o">.</span><span class="n">unsqueeze_</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span><span class="o">.</span><span class="n">unsqueeze_</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+        <span class="k">except</span> <span class="p">(</span><span class="ne">KeyError</span><span class="p">,</span> <span class="ne">ValueError</span><span class="p">,</span> <span class="ne">TypeError</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Please make sure &#39;precip&#39; and &#39;evap&#39; are provided in the dataset&quot;</span><span class="p">)</span>
+
+    <span class="c1"># Read the initial states from the NetCDF GOTM output file.</span>
+    <span class="c1"># Might be replaced by initialization from .yaml files.</span>
+    <span class="n">init_state</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="c1"># Important: Only pelagic variables (with a vertical size = nlev) should be included here.</span>
+    <span class="c1"># Benthic variables can&#39;t be included here because they have a different shape</span>
+    <span class="c1"># in the vertical dimension.</span>
+    <span class="k">if</span> <span class="n">model</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">for</span> <span class="n">_variable</span> <span class="ow">in</span> <span class="n">model</span><span class="o">.</span><span class="n">tracer_names</span><span class="p">:</span>
+            <span class="n">init_state</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                <span class="n">torch</span><span class="o">.</span><span class="n">from_numpy</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">ds</span><span class="p">[</span><span class="n">_variable</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;/&quot;</span><span class="p">,</span> <span class="s2">&quot;_&quot;</span><span class="p">)][</span><span class="mi">0</span><span class="p">]))</span>
+                <span class="o">.</span><span class="n">squeeze</span><span class="p">()</span>
+                <span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype_class</span><span class="p">)</span>
+            <span class="p">)</span>
+        <span class="n">init_state</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">stack</span><span class="p">(</span><span class="n">init_state</span><span class="p">,</span> <span class="n">dim</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span><span class="o">.</span><span class="n">unsqueeze</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>  <span class="c1"># shape [batch, tracer, z]</span>
+
+    <span class="c1"># Retrieve initial states and full time series for model tracers</span>
+    <span class="n">init_state_tensors</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">init_state_benthic_tensors</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">full_ts_tensors</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">full_ts_benthic_tensors</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">_m</span> <span class="ow">in</span> <span class="n">models</span><span class="p">:</span>
+        <span class="n">_i</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">_i_b</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">_ts</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">_ts_b</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">_variable</span> <span class="ow">in</span> <span class="n">_m</span><span class="o">.</span><span class="n">tracer_names</span><span class="p">:</span>
+            <span class="n">_i</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                <span class="n">torch</span><span class="o">.</span><span class="n">from_numpy</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">ds</span><span class="p">[</span><span class="n">_variable</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;/&quot;</span><span class="p">,</span> <span class="s2">&quot;_&quot;</span><span class="p">)][</span><span class="mi">0</span><span class="p">]))</span>
+                <span class="o">.</span><span class="n">squeeze</span><span class="p">()</span>
+                <span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype_class</span><span class="p">)</span>
+            <span class="p">)</span>
+            <span class="n">_ts</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                <span class="n">torch</span><span class="o">.</span><span class="n">from_numpy</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">ds</span><span class="p">[</span><span class="n">_variable</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;/&quot;</span><span class="p">,</span> <span class="s2">&quot;_&quot;</span><span class="p">)][:]))</span>
+                <span class="o">.</span><span class="n">squeeze</span><span class="p">()</span>
+                <span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype_class</span><span class="p">)</span>
+            <span class="p">)</span>
+        <span class="k">for</span> <span class="n">_variable</span> <span class="ow">in</span> <span class="n">_m</span><span class="o">.</span><span class="n">benthic_tracer_names</span><span class="p">:</span>
+            <span class="n">_i_b</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                <span class="n">torch</span><span class="o">.</span><span class="n">from_numpy</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">ds</span><span class="p">[</span><span class="n">_variable</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;/&quot;</span><span class="p">,</span> <span class="s2">&quot;_&quot;</span><span class="p">)][</span><span class="mi">0</span><span class="p">]))</span>
+                <span class="o">.</span><span class="n">squeeze</span><span class="p">()</span>
+                <span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype_class</span><span class="p">)</span>
+            <span class="p">)</span>
+            <span class="n">_ts_b</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                <span class="n">torch</span><span class="o">.</span><span class="n">from_numpy</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">ds</span><span class="p">[</span><span class="n">_variable</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;/&quot;</span><span class="p">,</span> <span class="s2">&quot;_&quot;</span><span class="p">)][:]))</span>
+                <span class="o">.</span><span class="n">squeeze</span><span class="p">()</span>
+                <span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype_class</span><span class="p">)</span>
+            <span class="p">)</span>
+        <span class="n">init_state_tensors</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">stack</span><span class="p">(</span><span class="n">_i</span><span class="p">,</span> <span class="n">dim</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span><span class="o">.</span><span class="n">unsqueeze_</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span> <span class="k">if</span> <span class="n">_i</span> <span class="k">else</span> <span class="kc">None</span><span class="p">)</span>
+        <span class="n">full_ts_tensors</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">stack</span><span class="p">(</span><span class="n">_ts</span><span class="p">,</span> <span class="n">dim</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span><span class="o">.</span><span class="n">unsqueeze_</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span> <span class="k">if</span> <span class="n">_ts</span> <span class="k">else</span> <span class="kc">None</span><span class="p">)</span>
+        <span class="n">init_state_benthic_tensors</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">stack</span><span class="p">(</span><span class="n">_i_b</span><span class="p">,</span> <span class="n">dim</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span><span class="o">.</span><span class="n">unsqueeze_</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span> <span class="k">if</span> <span class="n">_i_b</span> <span class="k">else</span> <span class="kc">None</span><span class="p">)</span>
+        <span class="n">full_ts_benthic_tensors</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">stack</span><span class="p">(</span><span class="n">_ts_b</span><span class="p">,</span> <span class="n">dim</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span><span class="o">.</span><span class="n">unsqueeze_</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span> <span class="k">if</span> <span class="n">_ts_b</span> <span class="k">else</span> <span class="kc">None</span><span class="p">)</span>
+
+    <span class="c1"># Retrieve additional output time series for model tracers</span>
+    <span class="n">output_fields</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">_m</span> <span class="ow">in</span> <span class="n">models</span><span class="p">:</span>
+        <span class="n">_o</span> <span class="o">=</span> <span class="n">TensorDict</span><span class="p">()</span>
+        <span class="k">for</span> <span class="n">_variable</span> <span class="ow">in</span> <span class="n">_m</span><span class="o">.</span><span class="n">output_fields</span><span class="p">:</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">_o</span><span class="p">[</span><span class="n">_variable</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span>
+                    <span class="n">torch</span><span class="o">.</span><span class="n">from_numpy</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">ds</span><span class="p">[</span><span class="n">_variable</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;/&quot;</span><span class="p">,</span> <span class="s2">&quot;_&quot;</span><span class="p">)][:]))</span>
+                    <span class="o">.</span><span class="n">squeeze</span><span class="p">()</span>
+                    <span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype_class</span><span class="p">)</span>
+                <span class="p">)</span>
+            <span class="k">except</span> <span class="p">(</span><span class="ne">KeyError</span><span class="p">,</span> <span class="ne">ValueError</span><span class="p">,</span> <span class="ne">TypeError</span><span class="p">,</span> <span class="ne">IndexError</span><span class="p">):</span>
+                <span class="k">pass</span>
+        <span class="n">output_fields</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">_o</span> <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">_o</span><span class="o">.</span><span class="n">keys</span><span class="p">())</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="k">else</span> <span class="kc">None</span><span class="p">)</span>
+
+    <span class="n">fields_dict</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="k">for</span> <span class="n">_variable</span> <span class="ow">in</span> <span class="n">fields</span><span class="p">:</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">fields_dict</span><span class="p">[</span><span class="n">_variable</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="n">torch</span><span class="o">.</span><span class="n">from_numpy</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">ds</span><span class="p">[</span><span class="n">_variable</span><span class="p">][:]))</span><span class="o">.</span><span class="n">squeeze</span><span class="p">()</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype_class</span><span class="p">)</span>
+            <span class="p">)</span>
+        <span class="k">except</span> <span class="p">(</span><span class="ne">KeyError</span><span class="p">,</span> <span class="ne">ValueError</span><span class="p">,</span> <span class="ne">TypeError</span><span class="p">):</span>
+            <span class="k">pass</span>
+
+    <span class="c1"># Get dynamic_inputs for models</span>
+    <span class="n">dynamic_input_names</span> <span class="o">=</span> <span class="nb">set</span><span class="p">([</span><span class="s2">&quot;h&quot;</span><span class="p">,</span> <span class="s2">&quot;nu&quot;</span><span class="p">])</span>
+    <span class="k">for</span> <span class="n">_m</span> <span class="ow">in</span> <span class="n">models</span><span class="p">:</span>
+        <span class="n">dynamic_input_names</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">_m</span><span class="o">.</span><span class="n">dependencies</span><span class="p">)</span>
+    <span class="n">dynamic_inputs</span> <span class="o">=</span> <span class="n">TensorDict</span><span class="p">(</span><span class="n">batch_size</span><span class="o">=</span><span class="n">h</span><span class="o">.</span><span class="n">shape</span><span class="p">[:</span><span class="mi">2</span><span class="p">],</span> <span class="n">device</span><span class="o">=</span><span class="n">h</span><span class="o">.</span><span class="n">device</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">dependency</span> <span class="ow">in</span> <span class="n">dynamic_input_names</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">dependency</span> <span class="o">==</span> <span class="s2">&quot;wind&quot;</span><span class="p">:</span>
+            <span class="c1"># wind is typically not provided, but needs to be computed from u10 and v10</span>
+            <span class="n">u10</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">ds</span><span class="p">[</span><span class="s2">&quot;u10&quot;</span><span class="p">]),</span> <span class="n">device</span><span class="o">=</span><span class="n">h</span><span class="o">.</span><span class="n">device</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">h</span><span class="o">.</span><span class="n">dtype</span><span class="p">)</span><span class="o">.</span><span class="n">squeeze</span><span class="p">()</span><span class="o">.</span><span class="n">unsqueeze</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+            <span class="n">v10</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">ds</span><span class="p">[</span><span class="s2">&quot;v10&quot;</span><span class="p">]),</span> <span class="n">device</span><span class="o">=</span><span class="n">h</span><span class="o">.</span><span class="n">device</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">h</span><span class="o">.</span><span class="n">dtype</span><span class="p">)</span><span class="o">.</span><span class="n">squeeze</span><span class="p">()</span><span class="o">.</span><span class="n">unsqueeze</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+            <span class="n">wind</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">u10</span><span class="o">**</span><span class="mi">2</span> <span class="o">+</span> <span class="n">v10</span><span class="o">**</span><span class="mi">2</span><span class="p">)</span>
+            <span class="n">dynamic_inputs</span><span class="p">[</span><span class="s2">&quot;wind&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">wind</span>
+        <span class="k">elif</span> <span class="n">dependency</span> <span class="o">==</span> <span class="s2">&quot;h&quot;</span><span class="p">:</span>
+            <span class="n">dynamic_inputs</span><span class="p">[</span><span class="s2">&quot;h&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">h</span>
+        <span class="k">elif</span> <span class="n">dependency</span> <span class="o">==</span> <span class="s2">&quot;nu&quot;</span><span class="p">:</span>
+            <span class="n">dynamic_inputs</span><span class="p">[</span><span class="s2">&quot;nu&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">nuh</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">_i</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">ds</span><span class="p">[</span><span class="n">dependency</span><span class="p">]),</span> <span class="n">device</span><span class="o">=</span><span class="n">h</span><span class="o">.</span><span class="n">device</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">h</span><span class="o">.</span><span class="n">dtype</span><span class="p">)</span><span class="o">.</span><span class="n">squeeze</span><span class="p">()</span><span class="o">.</span><span class="n">unsqueeze</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+            <span class="n">dynamic_inputs</span><span class="p">[</span><span class="n">dependency</span><span class="p">]</span> <span class="o">=</span> <span class="n">_i</span>
+
+    <span class="c1"># Return the result as a dictionary so that additional results can be included in the future</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="s2">&quot;nlev&quot;</span><span class="p">:</span> <span class="n">nlev</span><span class="p">,</span>
+        <span class="s2">&quot;dt&quot;</span><span class="p">:</span> <span class="n">dt</span><span class="p">,</span>
+        <span class="s2">&quot;model&quot;</span><span class="p">:</span> <span class="n">model</span><span class="p">,</span>
+        <span class="s2">&quot;models&quot;</span><span class="p">:</span> <span class="n">models</span><span class="p">,</span>
+        <span class="s2">&quot;h_batches_tracers&quot;</span><span class="p">:</span> <span class="n">h</span><span class="p">,</span>
+        <span class="s2">&quot;h&quot;</span><span class="p">:</span> <span class="n">h</span><span class="p">,</span>
+        <span class="s2">&quot;nuh_batches_tracers&quot;</span><span class="p">:</span> <span class="n">nuh</span><span class="p">,</span>
+        <span class="s2">&quot;nu&quot;</span><span class="p">:</span> <span class="n">nuh</span><span class="p">,</span>
+        <span class="s2">&quot;dilution&quot;</span><span class="p">:</span> <span class="n">dilution</span><span class="p">,</span>
+        <span class="s2">&quot;dynamic_inputs&quot;</span><span class="p">:</span> <span class="n">dynamic_inputs</span><span class="p">,</span>
+        <span class="s2">&quot;init_state&quot;</span><span class="p">:</span> <span class="n">init_state</span><span class="p">,</span>
+        <span class="s2">&quot;init_state_tensors&quot;</span><span class="p">:</span> <span class="n">init_state_tensors</span><span class="p">,</span>
+        <span class="s2">&quot;full_ts_tensors&quot;</span><span class="p">:</span> <span class="n">full_ts_tensors</span><span class="p">,</span>
+        <span class="s2">&quot;init_state_benthic_tensors&quot;</span><span class="p">:</span> <span class="n">init_state_benthic_tensors</span><span class="p">,</span>
+        <span class="s2">&quot;full_ts_benthic_tensors&quot;</span><span class="p">:</span> <span class="n">full_ts_benthic_tensors</span><span class="p">,</span>
+        <span class="s2">&quot;output_fields&quot;</span><span class="p">:</span> <span class="n">output_fields</span><span class="p">,</span>
+        <span class="s2">&quot;fields&quot;</span><span class="p">:</span> <span class="n">fields_dict</span><span class="p">,</span>
+        <span class="s2">&quot;t&quot;</span><span class="p">:</span> <span class="n">t</span><span class="p">,</span>  <span class="c1"># for plotting purposes</span>
+        <span class="s2">&quot;z&quot;</span><span class="p">:</span> <span class="n">z</span><span class="p">,</span>
+        <span class="s2">&quot;zi&quot;</span><span class="p">:</span> <span class="n">zi</span><span class="p">,</span>
+        <span class="s2">&quot;scheme&quot;</span><span class="p">:</span> <span class="n">scheme</span><span class="p">,</span>
+    <span class="p">}</span>
+
+    <span class="k">del</span> <span class="n">ds</span>
+    <span class="k">return</span> <span class="n">result</span></div>
+
+
+
+<div class="viewcode-block" id="run_gotm">
+<a class="viewcode-back" href="../../../_autosummary/marinade.gotm.gotm.run_gotm.html#marinade.gotm.gotm.run_gotm">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">run_gotm</span><span class="p">(</span>
+    <span class="n">gotm_yaml_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="n">fabm_yaml_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="n">gotm_nc_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="n">device</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;cpu&quot;</span><span class="p">,</span>
+    <span class="n">dtype</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;float64&quot;</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Set up and run a GOTM-FABM simulation from GOTM/FABM configuration (.yaml) and GOTM-FABM output NetCDF files.</span>
+
+<span class="sd">    Computes tracer advection and diffusion given the flow fields from the GOTM simulation.</span>
+
+<span class="sd">    May be used for checking consistency with the GOTM-FABM simulation in Fortran.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        gotm_yaml_path (str): Path of the gotm.yaml configuration file.</span>
+<span class="sd">        fabm_yaml_path (str): Path of the fabm.yaml configuration file.</span>
+<span class="sd">        gotm_nc_path (str): Path of the NetCDF GOTM-FABM output file.</span>
+<span class="sd">        device (str, optional): Device for torch computations. Defaults to &#39;cpu&#39;.</span>
+<span class="sd">        dtype (str, optional): Data type for torch computations. Defaults to &#39;float64&#39;.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        torch.Tensor: Simulated tracer fields. [batch, time, tracer, nlev]</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">initialization_dict</span> <span class="o">=</span> <span class="n">initialize_gotm</span><span class="p">(</span><span class="n">gotm_yaml_path</span><span class="p">,</span> <span class="n">fabm_yaml_path</span><span class="p">,</span> <span class="n">gotm_nc_path</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">)</span>
+    <span class="n">model</span><span class="p">:</span> <span class="n">BaseModel</span> <span class="o">=</span> <span class="n">initialization_dict</span><span class="p">[</span><span class="s2">&quot;model&quot;</span><span class="p">]</span>
+    <span class="n">h_batches_tracers</span> <span class="o">=</span> <span class="n">initialization_dict</span><span class="p">[</span><span class="s2">&quot;h_batches_tracers&quot;</span><span class="p">]</span>
+    <span class="n">nuh_batches_tracers</span> <span class="o">=</span> <span class="n">initialization_dict</span><span class="p">[</span><span class="s2">&quot;nuh_batches_tracers&quot;</span><span class="p">]</span>
+    <span class="n">init_state</span> <span class="o">=</span> <span class="n">initialization_dict</span><span class="p">[</span><span class="s2">&quot;init_state&quot;</span><span class="p">]</span>
+    <span class="n">dt</span> <span class="o">=</span> <span class="n">initialization_dict</span><span class="p">[</span><span class="s2">&quot;dt&quot;</span><span class="p">]</span>
+    <span class="n">scheme</span> <span class="o">=</span> <span class="n">initialization_dict</span><span class="p">[</span><span class="s2">&quot;scheme&quot;</span><span class="p">]</span>
+
+    <span class="n">transport_operator</span> <span class="o">=</span> <span class="n">TracerSimulationOperator</span><span class="p">(</span>
+        <span class="n">bc_up_type_dif</span><span class="o">=</span><span class="s2">&quot;neumann&quot;</span><span class="p">,</span>
+        <span class="n">bc_down_type_dif</span><span class="o">=</span><span class="s2">&quot;neumann&quot;</span><span class="p">,</span>
+        <span class="n">bc_up_value_dif</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span>
+        <span class="n">bc_down_value_dif</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span>
+        <span class="n">bc_up_type_adv</span><span class="o">=</span><span class="s2">&quot;flux&quot;</span><span class="p">,</span>
+        <span class="n">bc_down_type_adv</span><span class="o">=</span><span class="s2">&quot;flux&quot;</span><span class="p">,</span>
+        <span class="n">bc_up_value_adv</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span>
+        <span class="n">bc_down_value_adv</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span>
+        <span class="n">implicitness</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span>
+        <span class="n">allow_negative</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+        <span class="n">scheme_adv</span><span class="o">=</span><span class="n">scheme</span><span class="p">,</span>
+        <span class="n">conserve</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+        <span class="n">model</span><span class="o">=</span><span class="n">model</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="n">simulation</span> <span class="o">=</span> <span class="n">transport_operator</span><span class="o">.</span><span class="n">integrate</span><span class="p">(</span><span class="n">init_state</span><span class="p">,</span> <span class="n">dt</span><span class="p">,</span> <span class="n">h_batches_tracers</span><span class="p">,</span> <span class="n">nuh_batches_tracers</span><span class="p">)</span>
+
+    <span class="c1"># simulation = integrate_gotm(model, init_state, h_batches_tracers, nuh_batches_tracers, scheme=scheme)</span>
+
+    <span class="k">return</span> <span class="n">simulation</span></div>
+
+
+
+<div class="viewcode-block" id="TracerSimulationOperator">
+<a class="viewcode-back" href="../../../_autosummary/marinade.gotm.gotm.TracerSimulationOperator.html#marinade.gotm.gotm.TracerSimulationOperator">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">TracerSimulationOperator</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Simulation operator class for combined tracer advection, diffusion and BGC reactions.</span>
+
+<span class="sd">    Should be initialized with the important numerical parameters and schemes for the simulation. Has a *forward* method</span>
+<span class="sd">    for computing a single time step. Calling the operator object itself also calls its *forward* method.</span>
+
+<span class="sd">    Also has an *integrate* method for a complete rollout.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        bc_up_type_dif (str): Type of upper boundary condition for diffusion. &quot;neumann&quot; or &quot;dirichlet&quot;.</span>
+<span class="sd">        bc_down_type_dif (str): Type of lower boundary condition for diffusion. &quot;neumann&quot; or &quot;dirichlet&quot;.</span>
+<span class="sd">        bc_up_value_dif (Union[float, torch.Tensor]): Value of upper boundary condition for diffusion.</span>
+<span class="sd">        bc_down_value_dif (Union[float, torch.Tensor]): Value of lower boundary condition for diffusion.</span>
+<span class="sd">        bc_up_type_adv (str): Type of upper boundary condition for advection</span>
+<span class="sd">            (&quot;flux&quot;, &quot;value&quot;, &quot;oneSided&quot;, &quot;zeroDivergence&quot;).</span>
+<span class="sd">        bc_down_type_adv (str): Type of lower boundary condition for advection</span>
+<span class="sd">            (&quot;flux&quot;, &quot;value&quot;, &quot;oneSided&quot;, &quot;zeroDivergence&quot;).</span>
+<span class="sd">        bc_up_value_adv (torch.Tensor): Value for upper boundary condition for advection.</span>
+<span class="sd">        bc_down_value_adv (torch.Tensor): Value for lower boundary condition for advection.</span>
+<span class="sd">        scheme_adv (str): Advection limiter scheme to use (&quot;superbee&quot;, &quot;p2_pdm&quot;, &quot;splmax13&quot;,</span>
+<span class="sd">            &quot;muscl&quot;, &quot;central&quot;, &quot;p2&quot;).</span>
+<span class="sd">        conserve (bool, optional): Whether to use the conservative form of the advection equation for the</span>
+<span class="sd">            advection due to fluid motion (sinking is always conservative). Defaults to False.</span>
+<span class="sd">        implicitness (float, optional): Implicitness parameter. Defaults to 1.0.</span>
+<span class="sd">        allow_negative (bool, optional): Allow negative tracer concentration values. Defaults to False.</span>
+<span class="sd">        freshwater_impact (bool, optional): Whether to consider the impact of freshwater dilution. Defaults to False.</span>
+<span class="sd">        method_tridiag (str, optional): Method for tridiagonal solver. One of (&quot;thomas&quot;, &quot;paracr&quot;, &quot;linalg&quot;).</span>
+<span class="sd">            Defaults to &quot;thomas&quot;.</span>
+<span class="sd">        implicit_backward_tridiag (bool, optional): If True, uses custom backward method based on implicit</span>
+<span class="sd">            differentiation. Defaults to True.</span>
+<span class="sd">        model (NPZDModel, optional): Nutrient-phytoplankton-zooplankton-detritus model for biogeochemical transport.</span>
+<span class="sd">            If None, no biogeochemical processes (including sinking) are evaluated. Defaults to None.</span>
+<span class="sd">        device (str, optional): Device for torch computations. Defaults to &#39;cpu&#39;.</span>
+<span class="sd">        dtype (str, optional): Data type for torch computations. Defaults to &#39;float64&#39;.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">bc_up_type_dif</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">bc_down_type_dif</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">bc_up_value_dif</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">],</span>
+        <span class="n">bc_down_value_dif</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">],</span>
+        <span class="n">bc_up_type_adv</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">bc_down_type_adv</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">bc_up_value_adv</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span>
+        <span class="n">bc_down_value_adv</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span>
+        <span class="n">scheme_adv</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">conserve</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+        <span class="n">implicitness</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1.0</span><span class="p">,</span>
+        <span class="n">allow_negative</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+        <span class="n">freshwater_impact</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+        <span class="n">method_tridiag</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;thomas&quot;</span><span class="p">,</span>
+        <span class="n">implicit_backward_tridiag</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+        <span class="n">model</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">BaseModel</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">device</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;cpu&quot;</span><span class="p">,</span>
+        <span class="n">dtype</span><span class="o">=</span><span class="s2">&quot;float64&quot;</span><span class="p">,</span>
+        <span class="o">*</span><span class="n">args</span><span class="p">,</span>
+        <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
+    <span class="p">):</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">dtype</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+            <span class="n">dtype</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">torch</span><span class="p">,</span> <span class="n">dtype</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">model</span> <span class="o">=</span> <span class="n">model</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">freshwater_impact</span> <span class="o">=</span> <span class="n">freshwater_impact</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">dif_op</span> <span class="o">=</span> <span class="n">DiffusionOperator</span><span class="p">(</span>
+            <span class="n">bc_up_type_dif</span><span class="p">,</span>
+            <span class="n">bc_down_type_dif</span><span class="p">,</span>
+            <span class="n">bc_up_value_dif</span>
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">bc_up_value_dif</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">)</span>
+            <span class="k">else</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="n">bc_up_value_dif</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">),</span>
+            <span class="n">bc_down_value_dif</span>
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">bc_down_value_dif</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">)</span>
+            <span class="k">else</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="n">bc_down_value_dif</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">),</span>
+            <span class="n">implicitness</span><span class="p">,</span>
+            <span class="n">allow_negative</span><span class="p">,</span>
+            <span class="n">method_tridiag</span><span class="p">,</span>
+            <span class="n">implicit_backward_tridiag</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="k">if</span> <span class="n">model</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">adv_op_sinking</span> <span class="o">=</span> <span class="n">AdvectionOperator</span><span class="p">(</span>
+                <span class="n">bc_up_type_adv</span><span class="p">,</span> <span class="n">bc_down_type_adv</span><span class="p">,</span> <span class="n">bc_up_value_adv</span><span class="p">,</span> <span class="n">bc_down_value_adv</span><span class="p">,</span> <span class="n">scheme_adv</span><span class="p">,</span> <span class="kc">True</span>
+            <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">adv_op_fluid</span> <span class="o">=</span> <span class="n">AdvectionOperator</span><span class="p">(</span>
+            <span class="n">bc_up_type_adv</span><span class="p">,</span> <span class="n">bc_down_type_adv</span><span class="p">,</span> <span class="n">bc_up_value_adv</span><span class="p">,</span> <span class="n">bc_down_value_adv</span><span class="p">,</span> <span class="n">scheme_adv</span><span class="p">,</span> <span class="n">conserve</span>
+        <span class="p">)</span>
+
+<div class="viewcode-block" id="TracerSimulationOperator.forward">
+<a class="viewcode-back" href="../../../_autosummary/marinade.gotm.gotm.TracerSimulationOperator.html#marinade.gotm.gotm.TracerSimulationOperator.forward">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">forward</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">concentration</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">TensorDict</span><span class="p">],</span>
+        <span class="n">dt</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="nb">float</span><span class="p">],</span>
+        <span class="n">h</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span>
+        <span class="n">nu</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span>
+        <span class="n">bc_up_value</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">bc_down_value</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">lsource</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">qsource</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">w</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">dilution</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">dynamic_inputs</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">TensorDict</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="o">*</span><span class="n">args</span><span class="p">,</span>
+        <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
+    <span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Forward function for time stepping operator.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            concentration (Union[torch.Tensor, TensorDict]): The initial tracer concentration field.</span>
+<span class="sd">                Can be a TensorDict. Then this operator acts on *concentration[&quot;pelagic&quot;]*. This</span>
+<span class="sd">                functionality exists because benthic (sediment) variables might be part of the tracer</span>
+<span class="sd">                state, but they are only on the ground and do not advect or diffuse. [batch, tracer, nlev]</span>
+<span class="sd">            dt (Union[float, torch.Tensor]): The time step for the simulation</span>
+<span class="sd">            h (torch.Tensor): Layer heights. [batch, 1, nlev]</span>
+<span class="sd">            nu (torch.Tensor): Diffusivity field. [batch, (tracer or 1), nlev+1]</span>
+<span class="sd">            bc_up_value (torch.Tensor, optional): Value of upper boundary condition. If None,</span>
+<span class="sd">                defaults to the value set at initialization. Defaults to None.</span>
+<span class="sd">            bc_down_value (torch.Tensor, optional): Value of lower boundary condition. If None,</span>
+<span class="sd">                defaults to the value set at initialization. Defaults to None.</span>
+<span class="sd">            lsource (torch.Tensor, optional): Linear source term. Defaults to None. [batch, (tracer or 1), nlev]</span>
+<span class="sd">            qsource (torch.Tensor, optional): Constant source term. Defaults to None. [batch, (tracer or 1), nlev]</span>
+<span class="sd">            w (torch.Tensor, optional): Vertical fluid velocity. Defaults to None. [batch, (tracer or 1), nlev+1]</span>
+<span class="sd">            dilution (torch.Tensor, optional): Freshwater influx due to precipitation (positive) or evaporation</span>
+<span class="sd">                (negative). Has to be provided if *freshwater_impact* was set to true at initialization of this</span>
+<span class="sd">                operator. Defaults to None. [batch, 1]</span>
+<span class="sd">            dynamic_inputs (TensorDict, optional): Additional inputs for the biogeochemical time step, if defined.</span>
+<span class="sd">                Should have the shared batch size [batch]. Defaults to None.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            Union[torch.Tensor, TensorDict]: The final tracer concentration field. [batch, tracer, nlev]</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">freshwater_impact</span><span class="p">:</span>
+            <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">dilution</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">),</span> <span class="s2">&quot;the input &#39;dilution&#39; has to be provided as a tensor&quot;</span>
+            <span class="n">sfl</span> <span class="o">=</span> <span class="n">concentration</span><span class="p">[</span><span class="s2">&quot;pelagic&quot;</span><span class="p">][</span><span class="o">...</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">concentration</span><span class="p">,</span> <span class="n">TensorDict</span><span class="p">)</span> <span class="k">else</span> <span class="n">concentration</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+            <span class="n">sfl</span> <span class="o">=</span> <span class="o">-</span><span class="n">sfl</span> <span class="o">*</span> <span class="n">dilution</span>
+            <span class="c1"># sfl = -dilution</span>
+            <span class="n">bc_up_value</span> <span class="o">=</span> <span class="n">sfl</span> <span class="k">if</span> <span class="n">bc_up_value</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">sfl</span> <span class="o">+</span> <span class="n">bc_up_value</span>
+        <span class="c1"># advection due to sinking</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">model</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">ws</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">get_vertical_movement</span><span class="p">(</span><span class="n">concentration</span><span class="p">,</span> <span class="n">dynamic_inputs</span><span class="p">)</span>
+            <span class="n">concentration</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">adv_op_sinking</span><span class="o">.</span><span class="n">forward</span><span class="p">(</span><span class="n">concentration</span><span class="p">,</span> <span class="n">dt</span><span class="p">,</span> <span class="n">h</span><span class="p">,</span> <span class="n">ws</span><span class="p">)</span>
+        <span class="c1"># advection due to fluid motion</span>
+        <span class="k">if</span> <span class="n">w</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">concentration</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">adv_op_fluid</span><span class="o">.</span><span class="n">forward</span><span class="p">(</span><span class="n">concentration</span><span class="p">,</span> <span class="n">dt</span><span class="p">,</span> <span class="n">h</span><span class="p">,</span> <span class="n">w</span><span class="p">)</span>
+        <span class="n">concentration</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">dif_op</span><span class="o">.</span><span class="n">forward</span><span class="p">(</span><span class="n">concentration</span><span class="p">,</span> <span class="n">dt</span><span class="p">,</span> <span class="n">h</span><span class="p">,</span> <span class="n">nu</span><span class="p">,</span> <span class="n">lsource</span><span class="p">,</span> <span class="n">qsource</span><span class="p">,</span> <span class="n">bc_up_value</span><span class="p">,</span> <span class="n">bc_down_value</span><span class="p">)</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">model</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="c1"># correct state (only changes state if model.repair_state == True)</span>
+            <span class="n">concentration</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">do_repair_state</span><span class="p">(</span><span class="n">concentration</span><span class="p">)</span>
+            <span class="n">concentration</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">forward</span><span class="p">(</span>
+                <span class="n">concentration</span><span class="p">,</span>
+                <span class="n">dt</span><span class="p">,</span>
+                <span class="n">dynamic_inputs</span><span class="o">=</span><span class="n">dynamic_inputs</span><span class="p">,</span>
+                <span class="n">h</span><span class="o">=</span><span class="n">h</span><span class="p">,</span>
+                <span class="o">*</span><span class="n">args</span><span class="p">,</span>
+                <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
+            <span class="p">)</span>
+            <span class="n">concentration</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">do_repair_state</span><span class="p">(</span><span class="n">concentration</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">concentration</span></div>
+
+
+    <span class="fm">__call__</span> <span class="o">=</span> <span class="n">forward</span>
+
+<div class="viewcode-block" id="TracerSimulationOperator.integrate">
+<a class="viewcode-back" href="../../../_autosummary/marinade.gotm.gotm.TracerSimulationOperator.html#marinade.gotm.gotm.TracerSimulationOperator.integrate">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">integrate</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">init_state</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">TensorDict</span><span class="p">],</span>
+        <span class="n">dt</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span>
+        <span class="n">h</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span>
+        <span class="n">nu</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span>
+        <span class="n">bc_up_value</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">bc_down_value</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">lsource</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">qsource</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">w</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">dilution</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">dynamic_inputs</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">TensorDict</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="o">*</span><span class="n">args</span><span class="p">,</span>
+        <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Compute a rollout of the transport operator from initial state and forcing conditions. The shape of the</span>
+<span class="sd">        forcing fields in the time axis determines the rollout length.</span>
+
+<span class="sd">        Note that :math:`h^{n+1}`, :math:`\\nu^n`, and :math:`w^n` are used</span>
+<span class="sd">        for the computation of the concentrations at time step :math:`n+1`.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            init_state (Union[torch.Tensor, TensorDict]): The initial state. Can be a TensorDict.</span>
+<span class="sd">                Then this operator acts on *init_state[&quot;pelagic&quot;]*. This functionality exists because</span>
+<span class="sd">                benthic (sediment) variables might be part of the tracer state, but they are only on the ground</span>
+<span class="sd">                and do not advect or diffuse. [batch, tracer, nlev]</span>
+<span class="sd">            dt (float): The time step for the simulation</span>
+<span class="sd">            h (torch.Tensor): The layer heights. [batch, time, 1, nlev]</span>
+<span class="sd">            nu (torch.Tensor): The diffusivity field. [batch, time, 1, nlev+1]</span>
+<span class="sd">            bc_up_value (torch.Tensor, optional): Value of upper boundary condition. If None,</span>
+<span class="sd">                defaults to the value set at initialization. Defaults to None.</span>
+<span class="sd">            bc_down_value (torch.Tensor, optional): Value of lower boundary condition. If None,</span>
+<span class="sd">                defaults to the value set at initialization. Defaults to None.</span>
+<span class="sd">            lsource (torch.Tensor, optional): Linear source term (optional).</span>
+<span class="sd">                Defaults to None. [batch, time, (tracer or 1), nlev]</span>
+<span class="sd">            qsource (torch.Tensor, optional): Constant source term (optional).</span>
+<span class="sd">                Defaults to None. [batch, time, (tracer or 1), nlev]</span>
+<span class="sd">            w (torch.Tensor, optional): Vertical fluid velocity component.</span>
+<span class="sd">                Defaults to None. [batch, time, (tracer or 1), nlev+1]</span>
+<span class="sd">            dilution (torch.Tensor, optional): Freshwater influx due to precipitation (positive) or evaporation</span>
+<span class="sd">                (negative). Has to be provided if *freshwater_impact* was set to true at initialization of this</span>
+<span class="sd">                operator. Defaults to None. [batch, time, 1]</span>
+<span class="sd">            dynamic_inputs (TensorDict, optional): Additional inputs for the biogeochemical time step, if defined.</span>
+<span class="sd">                Should have the shared batch size [batch, time].</span>
+
+
+<span class="sd">        Returns:</span>
+<span class="sd">            Union[torch.Tensor, TensorDict]: The integrated tracer concentrations. [batch, time, tracer, nlev]</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="n">simulation</span> <span class="o">=</span> <span class="p">[</span><span class="n">init_state</span><span class="p">]</span>
+
+        <span class="k">if</span> <span class="n">h</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">!=</span> <span class="n">nu</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;h and nu do not have the same shape in the second dimension (time)&quot;</span><span class="p">)</span>
+
+        <span class="c1"># exchange axes for simpler iteration</span>
+        <span class="n">h</span> <span class="o">=</span> <span class="n">h</span><span class="o">.</span><span class="n">swapaxes</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>  <span class="c1"># time first</span>
+        <span class="n">nu</span> <span class="o">=</span> <span class="n">nu</span><span class="o">.</span><span class="n">swapaxes</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">lsource</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">lsource</span> <span class="o">=</span> <span class="n">lsource</span><span class="o">.</span><span class="n">swapaxes</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">qsource</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">qsource</span> <span class="o">=</span> <span class="n">qsource</span><span class="o">.</span><span class="n">swapaxes</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">w</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">w</span> <span class="o">=</span> <span class="n">w</span><span class="o">.</span><span class="n">swapaxes</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">freshwater_impact</span><span class="p">:</span>
+            <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">dilution</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">),</span> <span class="s2">&quot;the input &#39;dilution&#39; has to be provided as a tensor&quot;</span>
+            <span class="n">dilution</span> <span class="o">=</span> <span class="n">dilution</span><span class="o">.</span><span class="n">swapaxes</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">dynamic_inputs</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">dynamic_inputs</span> <span class="o">=</span> <span class="n">dynamic_inputs</span><span class="o">.</span><span class="n">transpose</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+
+        <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="p">(</span><span class="n">_h</span><span class="p">,</span> <span class="n">_nu</span><span class="p">)</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="nb">zip</span><span class="p">(</span><span class="n">h</span><span class="p">[</span><span class="mi">1</span><span class="p">:],</span> <span class="n">nu</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">])):</span>  <span class="c1"># use layer height of next time step, but current nu</span>
+            <span class="n">state</span> <span class="o">=</span> <span class="n">simulation</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+            <span class="n">w_fluid</span> <span class="o">=</span> <span class="n">w</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="k">if</span> <span class="n">w</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="kc">None</span>  <span class="c1"># TODO might want to use i+1</span>
+            <span class="n">state</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">forward</span><span class="p">(</span>
+                <span class="n">state</span><span class="p">,</span>
+                <span class="n">dt</span><span class="p">,</span>
+                <span class="n">_h</span><span class="p">,</span>
+                <span class="n">_nu</span><span class="p">,</span>
+                <span class="n">bc_up_value</span><span class="o">=</span><span class="n">bc_up_value</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="k">if</span> <span class="n">bc_up_value</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="kc">None</span><span class="p">,</span>  <span class="c1"># TODO might want to use i+1</span>
+                <span class="n">bc_down_value</span><span class="o">=</span><span class="n">bc_down_value</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="k">if</span> <span class="n">bc_down_value</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="kc">None</span><span class="p">,</span>  <span class="c1"># TODO might want to use i+1</span>
+                <span class="n">lsource</span><span class="o">=</span><span class="n">lsource</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="k">if</span> <span class="n">lsource</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="kc">None</span><span class="p">,</span>  <span class="c1"># TODO might want to use i+1</span>
+                <span class="n">qsource</span><span class="o">=</span><span class="n">qsource</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="k">if</span> <span class="n">qsource</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="kc">None</span><span class="p">,</span>  <span class="c1"># TODO might want to use i+1</span>
+                <span class="n">w</span><span class="o">=</span><span class="n">w_fluid</span><span class="p">,</span>
+                <span class="n">dilution</span><span class="o">=</span><span class="n">dilution</span><span class="p">[</span><span class="n">i</span> <span class="o">+</span> <span class="mi">1</span><span class="p">]</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">freshwater_impact</span> <span class="k">else</span> <span class="kc">None</span><span class="p">,</span>
+                <span class="n">dynamic_inputs</span><span class="o">=</span><span class="n">dynamic_inputs</span><span class="p">[</span><span class="n">i</span> <span class="o">+</span> <span class="mi">1</span><span class="p">]</span> <span class="k">if</span> <span class="n">dynamic_inputs</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="kc">None</span><span class="p">,</span>
+                <span class="o">*</span><span class="n">args</span><span class="p">,</span>
+                <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
+            <span class="p">)</span>
+            <span class="n">simulation</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">state</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">torch</span><span class="o">.</span><span class="n">stack</span><span class="p">(</span><span class="n">simulation</span><span class="p">,</span> <span class="n">dim</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span></div>
+</div>
+
+</pre></div>
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../../../index.html">
+              <img class="logo" src="../../../_static/m-dml_logo_banner_cropped.png" alt="Logo of MARINADE"/>
+            </a></p>
+<h1 class="logo"><a href="../../../index.html">MARINADE</a></h1>
+
+
+
+
+
+
+
+
+
+<search id="searchbox" style="display: none" role="search">
+    <div class="searchformwrapper">
+    <form class="search" action="../../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Search"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script><h3>Navigation</h3>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../index.html">Documentation of MARINADE</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../backward.html">Tridiagonal Backward Pass</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../backward.html#tridiagonal-forward-pass">Tridiagonal Forward Pass</a></li>
+</ul>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../_autosummary/marinade.html">marinade</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../../../index.html">Documentation overview</a><ul>
+  <li><a href="../../index.html">Module code</a><ul>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &#169;2026, m-dml team.
+      
+      |
+      Powered by <a href="https://www.sphinx-doc.org/">Sphinx 9.2.0</a>
+      &amp; <a href="https://alabaster.readthedocs.io">Alabaster 1.0.0</a>
+      
+    </div>
+
+    
+
+    
+  </body>
+</html>

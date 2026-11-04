@@ -1,0 +1,6 @@
+shared\_key\_tensordicts
+========================
+
+.. currentmodule:: marinade.fabm.bio_model
+
+.. autofunction:: shared_key_tensordicts

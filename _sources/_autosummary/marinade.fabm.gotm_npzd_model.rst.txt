@@ -1,0 +1,33 @@
+gotm\_npzd\_model
+=================
+
+
+.. automodule:: marinade.fabm.gotm_npzd_model
+
+    
+    
+    
+
+   
+   
+   
+
+   
+   
+   
+
+   
+   
+   .. rubric:: Classes
+
+   .. autosummary::
+      :toctree:
+      :template: custom-class.rst
+   
+      GOTMNPZDModel
+   
+   
+
+   
+   
+   

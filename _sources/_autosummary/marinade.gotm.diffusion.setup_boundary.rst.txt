@@ -1,0 +1,6 @@
+setup\_boundary
+===============
+
+.. currentmodule:: marinade.gotm.diffusion
+
+.. autofunction:: setup_boundary
